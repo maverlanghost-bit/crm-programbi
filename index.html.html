@@ -3,157 +3,418 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CRM Capacitaciones - Admin</title>
+    <title>CRM Pro - Capacitaciones</title>
     
-    <!-- Tailwind CSS (Estilos rápidos) -->
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Iconos (FontAwesome) -->
+    <!-- Iconos -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-    
+    <!-- SweetAlert2 (Para alertas bonitas) -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
     <style>
-        body { font-family: system-ui, -apple-system, sans-serif; }
-        /* Animación suave para filas nuevas */
-        .fade-in { animation: fadeIn 0.5s ease-in; }
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        body { font-family: system-ui, -apple-system, sans-serif; background-color: #f3f4f6; }
+        .fade-in { animation: fadeIn 0.3s ease-in; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+        
+        /* Estilos para el scrollbar de la tabla */
+        .custom-scrollbar::-webkit-scrollbar { height: 8px; width: 8px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; }
     </style>
 </head>
-<body class="bg-gray-100 text-gray-800">
+<body class="text-gray-800">
 
-    <!-- VISTA 1: LOGIN (Visible por defecto) -->
-    <div id="login-view" class="min-h-screen flex items-center justify-center p-4">
-        <div class="bg-white p-8 rounded-xl shadow-lg w-full max-w-md border border-gray-200">
-            <div class="text-center mb-6">
-                <div class="bg-blue-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <i class="fa-solid fa-user-shield text-2xl text-blue-600"></i>
+    <!-- === VISTA LOGIN === -->
+    <div id="login-view" class="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-blue-600 to-blue-800">
+        <div class="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-md">
+            <div class="text-center mb-8">
+                <div class="bg-blue-100 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4 shadow-inner">
+                    <i class="fa-solid fa-rocket text-3xl text-blue-600"></i>
                 </div>
-                <h2 class="text-2xl font-bold text-gray-800">Acceso Administrativo</h2>
-                <p class="text-gray-500 text-sm">Ingresa con tus credenciales de director</p>
+                <h2 class="text-3xl font-bold text-gray-800">CRM Director</h2>
+                <p class="text-gray-500 mt-2">Panel de Gestión Comercial</p>
             </div>
-
-            <form id="login-form" class="space-y-4">
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Correo Electrónico</label>
-                    <input type="email" id="login-email" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition" placeholder="admin@empresa.com" required>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Contraseña</label>
-                    <input type="password" id="login-password" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition" placeholder="••••••••" required>
-                </div>
-                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg transition transform active:scale-95 shadow-lg shadow-blue-500/30">
-                    Ingresar al CRM
+            <form id="login-form" class="space-y-5">
+                <input type="email" id="login-email" class="w-full p-4 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none" placeholder="admin@empresa.com" required>
+                <input type="password" id="login-password" class="w-full p-4 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Contraseña" required>
+                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-xl transition shadow-lg shadow-blue-500/40">
+                    Iniciar Sesión
                 </button>
             </form>
-            <p id="login-error" class="text-red-500 text-sm mt-4 text-center hidden bg-red-50 p-2 rounded border border-red-200"></p>
         </div>
     </div>
 
-    <!-- VISTA 2: DASHBOARD (Oculto inicialmente, se muestra tras login) -->
+    <!-- === VISTA DASHBOARD === -->
     <div id="dashboard-view" class="hidden min-h-screen flex flex-col">
         
-        <!-- Barra Superior -->
-        <nav class="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-10">
+        <!-- Navbar -->
+        <nav class="bg-white shadow-md z-20 sticky top-0">
             <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div class="flex justify-between h-16">
-                    <div class="flex items-center">
-                        <i class="fa-solid fa-chart-line text-blue-600 text-xl mr-3"></i>
-                        <h1 class="text-xl font-bold text-gray-800">Panel de Control</h1>
+                <div class="flex justify-between h-16 items-center">
+                    <div class="flex items-center gap-3">
+                        <div class="bg-blue-600 text-white p-2 rounded-lg"><i class="fa-solid fa-chart-pie"></i></div>
+                        <h1 class="text-xl font-bold tracking-tight text-gray-800">Panel de Control</h1>
                     </div>
                     <div class="flex items-center gap-4">
-                        <span id="user-display" class="text-sm text-gray-500 hidden sm:block">Usuario</span>
-                        <button id="logout-btn" class="text-sm text-red-600 hover:text-red-800 font-medium border border-red-200 px-3 py-1 rounded-md hover:bg-red-50 transition">
-                            <i class="fa-solid fa-sign-out-alt mr-1"></i> Salir
+                        <div class="text-right hidden sm:block">
+                            <p class="text-xs text-gray-500 uppercase font-bold">Usuario</p>
+                            <p id="user-display" class="text-sm font-medium text-gray-900">--</p>
+                        </div>
+                        <button id="logout-btn" class="bg-red-50 text-red-600 hover:bg-red-100 p-2 rounded-lg transition" title="Cerrar Sesión">
+                            <i class="fa-solid fa-right-from-bracket"></i>
                         </button>
                     </div>
                 </div>
             </div>
         </nav>
 
-        <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8">
+        <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
             
-            <!-- Tarjetas de Estadísticas -->
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-                <!-- Tarjeta: Total -->
-                <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between">
-                    <div>
-                        <p class="text-gray-500 text-sm font-medium">Total Leads</p>
-                        <p id="stat-total" class="text-3xl font-bold text-gray-800">--</p>
-                    </div>
-                    <div class="p-3 bg-blue-50 rounded-lg text-blue-600">
-                        <i class="fa-solid fa-users text-xl"></i>
-                    </div>
+            <!-- KPIs / Métricas -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-200 flex items-center justify-between">
+                    <div><p class="text-gray-500 text-xs uppercase font-bold">Total Leads</p><p id="kpi-total" class="text-3xl font-bold text-gray-800">0</p></div>
+                    <div class="p-3 bg-gray-100 rounded-full text-gray-500"><i class="fa-solid fa-users text-xl"></i></div>
                 </div>
-
-                <!-- Tarjeta: Pendientes (Urgente) -->
                 <div class="bg-white p-5 rounded-xl shadow-sm border-l-4 border-yellow-400 flex items-center justify-between">
-                    <div>
-                        <p class="text-gray-500 text-sm font-medium">Por Contactar</p>
-                        <p id="stat-pending" class="text-3xl font-bold text-yellow-600">--</p>
-                    </div>
-                    <div class="p-3 bg-yellow-50 rounded-lg text-yellow-600">
-                        <i class="fa-solid fa-clock text-xl"></i>
-                    </div>
+                    <div><p class="text-gray-500 text-xs uppercase font-bold">Pendientes</p><p id="kpi-pending" class="text-3xl font-bold text-yellow-600">0</p></div>
+                    <div class="p-3 bg-yellow-50 rounded-full text-yellow-600"><i class="fa-regular fa-clock text-xl"></i></div>
                 </div>
-
-                <!-- Tarjeta: Contactados -->
                 <div class="bg-white p-5 rounded-xl shadow-sm border-l-4 border-green-500 flex items-center justify-between">
-                    <div>
-                        <p class="text-gray-500 text-sm font-medium">Contactados</p>
-                        <p id="stat-contacted" class="text-3xl font-bold text-green-600">--</p>
-                    </div>
-                    <div class="p-3 bg-green-50 rounded-lg text-green-600">
-                        <i class="fa-solid fa-check-double text-xl"></i>
-                    </div>
+                    <div><p class="text-gray-500 text-xs uppercase font-bold">Cerrados/Contactados</p><p id="kpi-contacted" class="text-3xl font-bold text-green-600">0</p></div>
+                    <div class="p-3 bg-green-50 rounded-full text-green-600"><i class="fa-solid fa-check-double text-xl"></i></div>
                 </div>
-
-                <!-- Botón: Exportar -->
-                <button id="export-btn" class="bg-green-600 hover:bg-green-700 text-white p-5 rounded-xl shadow-lg shadow-green-500/20 transition flex flex-col items-center justify-center gap-2 h-full">
-                    <i class="fa-solid fa-file-excel text-2xl"></i>
-                    <span class="font-bold">Descargar Excel</span>
+                <button id="export-btn" class="bg-gradient-to-r from-green-600 to-green-500 hover:from-green-700 hover:to-green-600 text-white p-5 rounded-xl shadow-lg shadow-green-500/30 transition flex items-center justify-center gap-3">
+                    <i class="fa-solid fa-file-csv text-2xl"></i>
+                    <div class="text-left leading-tight"><span class="block font-bold">Exportar</span><span class="text-xs opacity-90">Descargar Excel</span></div>
                 </button>
             </div>
 
-            <!-- Tabla de Leads -->
-            <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                <div class="p-5 border-b border-gray-200 bg-gray-50 flex justify-between items-center flex-wrap gap-4">
-                    <h3 class="font-bold text-lg text-gray-800">Últimos Registros</h3>
-                    <div class="text-xs text-gray-500 flex gap-3">
-                        <div class="flex items-center"><span class="w-2 h-2 rounded-full bg-yellow-400 mr-1"></span> Pendiente</div>
-                        <div class="flex items-center"><span class="w-2 h-2 rounded-full bg-green-500 mr-1"></span> Contactado</div>
-                        <div class="flex items-center"><i class="fa-solid fa-briefcase text-gray-400 mr-1"></i> Empresa</div>
-                    </div>
+            <!-- Barra de Herramientas (Filtros) -->
+            <div class="flex flex-col sm:flex-row gap-4 justify-between items-center bg-white p-4 rounded-xl shadow-sm border border-gray-200">
+                <div class="relative w-full sm:w-96">
+                    <i class="fa-solid fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                    <input type="text" id="search-input" placeholder="Buscar por nombre, email o curso..." class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
                 </div>
-                
-                <div class="overflow-x-auto">
+                <div class="flex gap-2 w-full sm:w-auto">
+                    <select id="filter-status" class="p-2 border border-gray-300 rounded-lg bg-gray-50 text-sm focus:ring-2 focus:ring-blue-500 outline-none cursor-pointer">
+                        <option value="all">Todos los estados</option>
+                        <option value="pendiente">Solo Pendientes</option>
+                        <option value="contactado">Solo Contactados</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Tabla de Leads -->
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden flex flex-col">
+                <div class="overflow-x-auto custom-scrollbar">
                     <table class="w-full text-left border-collapse">
-                        <thead class="bg-gray-100 text-gray-600 text-xs uppercase tracking-wider font-semibold">
+                        <thead class="bg-gray-50 text-gray-500 text-xs uppercase tracking-wider font-semibold border-b border-gray-200">
                             <tr>
-                                <th class="p-4 border-b">Fecha</th>
-                                <th class="p-4 border-b">Nombre</th>
-                                <th class="p-4 border-b">Contacto</th>
-                                <th class="p-4 border-b">Interés</th>
-                                <th class="p-4 border-b">Estado</th>
-                                <th class="p-4 border-b text-center">Acciones</th>
+                                <th class="p-4 whitespace-nowrap">Fecha / Antigüedad</th>
+                                <th class="p-4">Cliente Potencial</th>
+                                <th class="p-4">Interés</th>
+                                <th class="p-4 text-center">Notas</th>
+                                <th class="p-4 text-center">Estado</th>
+                                <th class="p-4 text-center">Acciones</th>
                             </tr>
                         </thead>
                         <tbody id="leads-table-body" class="text-sm divide-y divide-gray-100">
-                            <!-- Aquí se inyectarán las filas con JavaScript -->
-                            <tr>
-                                <td colspan="6" class="p-8 text-center text-gray-500">
-                                    <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-2"></div>
-                                    <p>Cargando datos...</p>
-                                </td>
-                            </tr>
+                            <!-- Filas generadas por JS -->
+                            <tr><td colspan="6" class="p-10 text-center"><div class="spinner border-4 border-blue-500 border-t-transparent rounded-full w-8 h-8 mx-auto animate-spin"></div></td></tr>
                         </tbody>
                     </table>
+                </div>
+                <!-- Paginación simple o footer -->
+                <div class="p-3 border-t border-gray-200 bg-gray-50 text-xs text-center text-gray-400">
+                    Mostrando últimos registros en tiempo real
                 </div>
             </div>
 
         </main>
     </div>
 
-    <!-- Scripts de Lógica -->
-    <script type="module" src="./firebase-config.js"></script>
-    <script type="module" src="./admin-logic.js"></script>
+    <!-- === LÓGICA JAVASCRIPT === -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+        import { getFirestore, collection, query, orderBy, onSnapshot, doc, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
+        // CONFIGURACIÓN (Tus credenciales)
+        const firebaseConfig = {
+            apiKey: "AIzaSyDVlTFLAX1Ya28uoqQ-mqTFFakHxQ3GgVI",
+            authDomain: "crm-programbi-9934a.firebaseapp.com",
+            projectId: "crm-programbi-9934a",
+            storageBucket: "crm-programbi-9934a.firebasestorage.app",
+            messagingSenderId: "646856396244",
+            appId: "1:646856396244:web:6caacd7c27b644f087da41"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // Referencias
+        const loginView = document.getElementById('login-view');
+        const dashboardView = document.getElementById('dashboard-view');
+        const tableBody = document.getElementById('leads-table-body');
+        let allLeads = []; // Cache local para filtrar
+
+        // --- 1. AUTENTICACIÓN ---
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                loginView.classList.add('hidden');
+                dashboardView.classList.remove('hidden');
+                document.getElementById('user-display').textContent = user.email;
+                initRealTimeListener();
+            } else {
+                dashboardView.classList.add('hidden');
+                loginView.classList.remove('hidden');
+            }
+        });
+
+        document.getElementById('login-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('login-email').value;
+            const pass = document.getElementById('login-password').value;
+            try {
+                await signInWithEmailAndPassword(auth, email, pass);
+            } catch (err) {
+                Swal.fire('Error', 'Credenciales incorrectas', 'error');
+            }
+        });
+
+        document.getElementById('logout-btn').addEventListener('click', () => signOut(auth));
+
+        // --- 2. GESTIÓN DE DATOS EN TIEMPO REAL ---
+        function initRealTimeListener() {
+            const q = query(collection(db, "leads"), orderBy("fecha_creacion", "desc"));
+            
+            onSnapshot(q, (snapshot) => {
+                allLeads = [];
+                let kpiTotal = 0, kpiPending = 0, kpiContacted = 0;
+
+                snapshot.forEach(docSnap => {
+                    const data = docSnap.data();
+                    const lead = { id: docSnap.id, ...data };
+                    allLeads.push(lead);
+
+                    // KPIs
+                    kpiTotal++;
+                    if (data.status === 'contactado') kpiContacted++; else kpiPending++;
+                });
+
+                // Actualizar contadores
+                document.getElementById('kpi-total').textContent = kpiTotal;
+                document.getElementById('kpi-pending').textContent = kpiPending;
+                document.getElementById('kpi-contacted').textContent = kpiContacted;
+
+                renderTable(); // Dibujar tabla
+            });
+        }
+
+        // --- 3. RENDERIZADO INTELIGENTE ---
+        function renderTable() {
+            const filterText = document.getElementById('search-input').value.toLowerCase();
+            const filterStatus = document.getElementById('filter-status').value;
+
+            // Filtrar datos
+            const filtered = allLeads.filter(lead => {
+                const matchesText = (lead.nombre || '').toLowerCase().includes(filterText) || 
+                                    (lead.email || '').toLowerCase().includes(filterText) ||
+                                    (lead.curso_interes || '').toLowerCase().includes(filterText);
+                const matchesStatus = filterStatus === 'all' || lead.status === filterStatus;
+                return matchesText && matchesStatus;
+            });
+
+            tableBody.innerHTML = '';
+            
+            if (filtered.length === 0) {
+                tableBody.innerHTML = `<tr><td colspan="6" class="p-8 text-center text-gray-400">No se encontraron registros.</td></tr>`;
+                return;
+            }
+
+            filtered.forEach(lead => {
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-blue-50/50 border-b border-gray-50 transition fade-in group";
+                
+                // Cálculos de antigüedad y estado
+                const created = lead.fecha_creacion ? lead.fecha_creacion.toDate() : new Date();
+                const diffHours = (new Date() - created) / 36e5;
+                let timeColorClass = "text-gray-500";
+                if (lead.status !== 'contactado') {
+                    if (diffHours < 24) timeColorClass = "text-green-600 font-bold"; // Nuevo
+                    else if (diffHours > 48) timeColorClass = "text-red-500 font-bold"; // Urgente
+                }
+
+                // Detector de empresa
+                const isCompany = !['gmail.com', 'hotmail.com', 'outlook.com', 'yahoo.com'].some(d => (lead.email||'').includes(d));
+                const companyBadge = isCompany ? `<span class="bg-purple-100 text-purple-700 text-[10px] px-2 py-0.5 rounded-full ml-2 font-bold uppercase tracking-wider">Empresa</span>` : '';
+
+                // Notas (Truncadas)
+                const notePreview = lead.observaciones ? `<div class="text-xs text-gray-600 bg-yellow-50 p-1 rounded border border-yellow-100 truncate max-w-[150px]" title="${lead.observaciones}">📝 ${lead.observaciones}</div>` : `<span class="text-xs text-gray-300 italic group-hover:text-gray-400">Sin notas</span>`;
+
+                tr.innerHTML = `
+                    <td class="p-4 whitespace-nowrap">
+                        <div class="text-sm font-medium ${timeColorClass}">${timeAgo(created)}</div>
+                        <div class="text-xs text-gray-400">${created.toLocaleDateString()} ${created.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</div>
+                    </td>
+                    <td class="p-4">
+                        <div class="font-bold text-gray-800">${lead.nombre}</div>
+                        <div class="text-xs text-gray-500 flex items-center mt-1">
+                            ${lead.email} ${companyBadge}
+                        </div>
+                        <div class="text-xs text-gray-400 mt-0.5 font-mono">${lead.telefono || 'Sin teléfono'}</div>
+                    </td>
+                    <td class="p-4">
+                        <span class="bg-blue-50 text-blue-700 px-2 py-1 rounded-md text-xs font-semibold border border-blue-100 whitespace-nowrap">
+                            ${lead.curso_interes || 'General'}
+                        </span>
+                        ${lead.mensaje ? `<div class="mt-1 text-xs text-gray-400 italic truncate max-w-[120px]" title="${lead.mensaje}">"${lead.mensaje}"</div>` : ''}
+                    </td>
+                    <td class="p-4 text-center cursor-pointer hover:bg-yellow-50 transition rounded-lg" onclick="window.editNote('${lead.id}', '${lead.observaciones || ''}')">
+                        ${notePreview}
+                    </td>
+                    <td class="p-4 text-center">
+                         <button onclick="window.toggleStatus('${lead.id}', '${lead.status}')" 
+                            class="px-3 py-1 rounded-full text-xs font-bold shadow-sm transition transform hover:scale-105 ${lead.status === 'contactado' ? 'bg-green-100 text-green-700 border border-green-200' : 'bg-yellow-100 text-yellow-700 border border-yellow-200 animate-pulse'}">
+                            ${lead.status === 'contactado' ? '✓ Contactado' : '⏳ Pendiente'}
+                        </button>
+                    </td>
+                    <td class="p-4 text-center">
+                        <div class="flex items-center justify-center gap-2">
+                            <!-- Botón WhatsApp Inteligente -->
+                            <button onclick="window.openWhatsApp('${lead.telefono}', '${lead.nombre}', '${lead.curso_interes}')" 
+                                    class="w-8 h-8 rounded-full bg-green-50 text-green-600 hover:bg-green-500 hover:text-white transition flex items-center justify-center" title="Contactar por WhatsApp">
+                                <i class="fab fa-whatsapp"></i>
+                            </button>
+                            <!-- Botón Notas -->
+                            <button onclick="window.editNote('${lead.id}', '${lead.observaciones || ''}')" 
+                                    class="w-8 h-8 rounded-full bg-yellow-50 text-yellow-600 hover:bg-yellow-400 hover:text-white transition flex items-center justify-center" title="Editar Nota">
+                                <i class="fa-regular fa-pen-to-square"></i>
+                            </button>
+                            <!-- Botón Eliminar -->
+                            <button onclick="window.deleteLead('${lead.id}')" 
+                                    class="w-8 h-8 rounded-full bg-red-50 text-red-600 hover:bg-red-500 hover:text-white transition flex items-center justify-center opacity-0 group-hover:opacity-100" title="Eliminar Registro">
+                                <i class="fa-solid fa-trash"></i>
+                            </button>
+                        </div>
+                    </td>
+                `;
+                tableBody.appendChild(tr);
+            });
+        }
+
+        // Eventos de Filtro
+        document.getElementById('search-input').addEventListener('input', renderTable);
+        document.getElementById('filter-status').addEventListener('change', renderTable);
+
+        // --- 4. FUNCIONES GLOBALES (ACCIONES) ---
+        
+        // A) Cambiar Estado
+        window.toggleStatus = async (id, current) => {
+            const newStatus = current === 'contactado' ? 'pendiente' : 'contactado';
+            await updateDoc(doc(db, "leads", id), { status: newStatus });
+        };
+
+        // B) WhatsApp Inteligente (Con plantillas)
+        window.openWhatsApp = (phone, name, course) => {
+            if (!phone) return Swal.fire('Sin teléfono', 'Este usuario no dejó número.', 'warning');
+            
+            // Limpiar número
+            let p = phone.replace(/\D/g, '');
+            if (p.length === 9) p = '56' + p; // Asumir Chile si falta código
+
+            // Preguntar plantilla
+            Swal.fire({
+                title: 'Contactar por WhatsApp',
+                text: 'Elige una plantilla de mensaje:',
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonText: '👋 Saludo Inicial',
+                confirmButtonColor: '#25D366',
+                cancelButtonText: '📚 Info Curso',
+                cancelButtonColor: '#3b82f6',
+                showDenyButton: true,
+                denyButtonText: 'Abrir vacío',
+                denyButtonColor: '#9ca3af'
+            }).then((result) => {
+                let msg = "";
+                if (result.isConfirmed) {
+                    msg = `Hola ${name}, te saludo de ProgramBI. Vi que te interesaste en el curso de ${course}. ¿Cómo podemos ayudarte?`;
+                } else if (result.dismiss === Swal.DismissReason.cancel) {
+                    msg = `Hola ${name}, te adjunto la información detallada del curso de ${course} que solicitaste.`;
+                }
+                
+                window.open(`https://wa.me/${p}?text=${encodeURIComponent(msg)}`, '_blank');
+            });
+        };
+
+        // C) Editar Notas (Observaciones)
+        window.editNote = async (id, currentNote) => {
+            const { value: text } = await Swal.fire({
+                input: 'textarea',
+                inputLabel: 'Observaciones Internas',
+                inputPlaceholder: 'Escribe aquí (ej: Llamar el lunes...)',
+                inputValue: currentNote,
+                showCancelButton: true,
+                confirmButtonText: 'Guardar Nota'
+            });
+
+            if (text !== undefined) {
+                await updateDoc(doc(db, "leads", id), { observaciones: text });
+                Swal.fire({icon: 'success', title: 'Nota guardada', toast: true, position: 'top-end', showConfirmButton: false, timer: 1500});
+            }
+        };
+
+        // D) Eliminar Lead
+        window.deleteLead = async (id) => {
+            const result = await Swal.fire({
+                title: '¿Estás seguro?',
+                text: "No podrás revertir esto.",
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#ef4444',
+                confirmButtonText: 'Sí, eliminar'
+            });
+            if (result.isConfirmed) {
+                await deleteDoc(doc(db, "leads", id));
+                Swal.fire('Eliminado', 'El registro ha sido borrado.', 'success');
+            }
+        };
+
+        // E) Exportar a Excel
+        document.getElementById('export-btn').addEventListener('click', () => {
+            if (!allLeads.length) return;
+            let csv = "Fecha,Nombre,Email,Telefono,Curso,Mensaje,Estado,Observaciones\n";
+            allLeads.forEach(l => {
+                const date = l.fecha_creacion ? l.fecha_creacion.toDate().toLocaleDateString() : '';
+                const cleanMsg = (l.mensaje || '').replace(/,/g, ' ');
+                const cleanObs = (l.observaciones || '').replace(/,/g, ' ');
+                csv += `${date},${l.nombre},${l.email},${l.telefono},${l.curso_interes},${cleanMsg},${l.status},${cleanObs}\n`;
+            });
+            const link = document.createElement("a");
+            link.href = "data:text/csv;charset=utf-8," + encodeURI(csv);
+            link.download = "crm_leads.csv";
+            link.click();
+        });
+
+        // Utilidad: Tiempo relativo
+        function timeAgo(date) {
+            const seconds = Math.floor((new Date() - date) / 1000);
+            let interval = seconds / 31536000;
+            if (interval > 1) return Math.floor(interval) + " años";
+            interval = seconds / 2592000;
+            if (interval > 1) return Math.floor(interval) + " meses";
+            interval = seconds / 86400;
+            if (interval > 1) return Math.floor(interval) + " días";
+            interval = seconds / 3600;
+            if (interval > 1) return Math.floor(interval) + " horas";
+            interval = seconds / 60;
+            if (interval > 1) return Math.floor(interval) + " min";
+            return "Hace instantes";
+        }
+    </script>
 </body>
 </html>
