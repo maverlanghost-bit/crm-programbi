@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CRM Capacitaciones - Admin</title>
+    
+    <!-- Tailwind CSS (Estilos rápidos) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Iconos (FontAwesome) -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    
+    <style>
+        body { font-family: system-ui, -apple-system, sans-serif; }
+        /* Animación suave para filas nuevas */
+        .fade-in { animation: fadeIn 0.5s ease-in; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800">
+
+    <!-- VISTA 1: LOGIN (Visible por defecto) -->
+    <div id="login-view" class="min-h-screen flex items-center justify-center p-4">
+        <div class="bg-white p-8 rounded-xl shadow-lg w-full max-w-md border border-gray-200">
+            <div class="text-center mb-6">
+                <div class="bg-blue-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <i class="fa-solid fa-user-shield text-2xl text-blue-600"></i>
+                </div>
+                <h2 class="text-2xl font-bold text-gray-800">Acceso Administrativo</h2>
+                <p class="text-gray-500 text-sm">Ingresa con tus credenciales de director</p>
+            </div>
+
+            <form id="login-form" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Correo Electrónico</label>
+                    <input type="email" id="login-email" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition" placeholder="admin@empresa.com" required>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Contraseña</label>
+                    <input type="password" id="login-password" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition" placeholder="••••••••" required>
+                </div>
+                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg transition transform active:scale-95 shadow-lg shadow-blue-500/30">
+                    Ingresar al CRM
+                </button>
+            </form>
+            <p id="login-error" class="text-red-500 text-sm mt-4 text-center hidden bg-red-50 p-2 rounded border border-red-200"></p>
+        </div>
+    </div>
+
+    <!-- VISTA 2: DASHBOARD (Oculto inicialmente, se muestra tras login) -->
+    <div id="dashboard-view" class="hidden min-h-screen flex flex-col">
+        
+        <!-- Barra Superior -->
+        <nav class="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-10">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex justify-between h-16">
+                    <div class="flex items-center">
+                        <i class="fa-solid fa-chart-line text-blue-600 text-xl mr-3"></i>
+                        <h1 class="text-xl font-bold text-gray-800">Panel de Control</h1>
+                    </div>
+                    <div class="flex items-center gap-4">
+                        <span id="user-display" class="text-sm text-gray-500 hidden sm:block">Usuario</span>
+                        <button id="logout-btn" class="text-sm text-red-600 hover:text-red-800 font-medium border border-red-200 px-3 py-1 rounded-md hover:bg-red-50 transition">
+                            <i class="fa-solid fa-sign-out-alt mr-1"></i> Salir
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </nav>
+
+        <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8">
+            
+            <!-- Tarjetas de Estadísticas -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                <!-- Tarjeta: Total -->
+                <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-500 text-sm font-medium">Total Leads</p>
+                        <p id="stat-total" class="text-3xl font-bold text-gray-800">--</p>
+                    </div>
+                    <div class="p-3 bg-blue-50 rounded-lg text-blue-600">
+                        <i class="fa-solid fa-users text-xl"></i>
+                    </div>
+                </div>
+
+                <!-- Tarjeta: Pendientes (Urgente) -->
+                <div class="bg-white p-5 rounded-xl shadow-sm border-l-4 border-yellow-400 flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-500 text-sm font-medium">Por Contactar</p>
+                        <p id="stat-pending" class="text-3xl font-bold text-yellow-600">--</p>
+                    </div>
+                    <div class="p-3 bg-yellow-50 rounded-lg text-yellow-600">
+                        <i class="fa-solid fa-clock text-xl"></i>
+                    </div>
+                </div>
+
+                <!-- Tarjeta: Contactados -->
+                <div class="bg-white p-5 rounded-xl shadow-sm border-l-4 border-green-500 flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-500 text-sm font-medium">Contactados</p>
+                        <p id="stat-contacted" class="text-3xl font-bold text-green-600">--</p>
+                    </div>
+                    <div class="p-3 bg-green-50 rounded-lg text-green-600">
+                        <i class="fa-solid fa-check-double text-xl"></i>
+                    </div>
+                </div>
+
+                <!-- Botón: Exportar -->
+                <button id="export-btn" class="bg-green-600 hover:bg-green-700 text-white p-5 rounded-xl shadow-lg shadow-green-500/20 transition flex flex-col items-center justify-center gap-2 h-full">
+                    <i class="fa-solid fa-file-excel text-2xl"></i>
+                    <span class="font-bold">Descargar Excel</span>
+                </button>
+            </div>
+
+            <!-- Tabla de Leads -->
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                <div class="p-5 border-b border-gray-200 bg-gray-50 flex justify-between items-center flex-wrap gap-4">
+                    <h3 class="font-bold text-lg text-gray-800">Últimos Registros</h3>
+                    <div class="text-xs text-gray-500 flex gap-3">
+                        <div class="flex items-center"><span class="w-2 h-2 rounded-full bg-yellow-400 mr-1"></span> Pendiente</div>
+                        <div class="flex items-center"><span class="w-2 h-2 rounded-full bg-green-500 mr-1"></span> Contactado</div>
+                        <div class="flex items-center"><i class="fa-solid fa-briefcase text-gray-400 mr-1"></i> Empresa</div>
+                    </div>
+                </div>
+                
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead class="bg-gray-100 text-gray-600 text-xs uppercase tracking-wider font-semibold">
+                            <tr>
+                                <th class="p-4 border-b">Fecha</th>
+                                <th class="p-4 border-b">Nombre</th>
+                                <th class="p-4 border-b">Contacto</th>
+                                <th class="p-4 border-b">Interés</th>
+                                <th class="p-4 border-b">Estado</th>
+                                <th class="p-4 border-b text-center">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="leads-table-body" class="text-sm divide-y divide-gray-100">
+                            <!-- Aquí se inyectarán las filas con JavaScript -->
+                            <tr>
+                                <td colspan="6" class="p-8 text-center text-gray-500">
+                                    <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-2"></div>
+                                    <p>Cargando datos...</p>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <!-- Scripts de Lógica -->
+    <script type="module" src="./firebase-config.js"></script>
+    <script type="module" src="./admin-logic.js"></script>
+
+</body>
+</html>
