@@ -1,0 +1,114 @@
+/* =========================================
+   CRM DIRECTOR - ESTILOS ACTUALIZADOS (V2)
+   ========================================= */
+
+/* 1. ESTILOS BASE Y FUENTES */
+body { 
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; 
+    transition: background-color 0.3s ease, color 0.3s ease; 
+    overscroll-behavior-y: none;
+}
+
+/* 2. SCROLLBAR PERSONALIZADO */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+.dark ::-webkit-scrollbar-thumb { background: #4b5563; }
+::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+/* 3. GLASSMORPHISM & PANELES */
+.glass-panel {
+    background: rgba(255, 255, 255, 0.95); /* Más sólido para mejor lectura */
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.6);
+}
+.dark .glass-panel {
+    background: rgba(17, 24, 39, 0.9);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+}
+
+/* 4. ANIMACIONES */
+.fade-in { animation: fadeIn 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
+@keyframes fadeIn { 
+    from { opacity: 0; transform: translateY(5px); } 
+    to { opacity: 1; transform: translateY(0); } 
+}
+
+.highlight-row { animation: pulse-blue 2s infinite; }
+@keyframes pulse-blue {
+    0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4); }
+    70% { box-shadow: 0 0 0 4px rgba(59, 130, 246, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+}
+
+/* 5. KANBAN Y DRAG & DROP */
+.kanban-col { min-height: 200px; transition: background-color 0.2s; }
+.sortable-ghost { opacity: 0.4; background: #e2e8f0; border: 2px dashed #94a3b8; cursor: grabbing; }
+
+/* =========================================
+   NUEVOS ESTILOS: GESTOR DE EMAILS PRO
+   ========================================= */
+
+/* Item de la barra lateral (Lista de plantillas) */
+.email-sidebar-item {
+    transition: all 0.2s ease;
+    border-left: 3px solid transparent;
+    position: relative;
+    overflow: hidden;
+}
+.email-sidebar-item:hover {
+    background-color: rgba(59, 130, 246, 0.08);
+}
+.dark .email-sidebar-item:hover {
+    background-color: rgba(59, 130, 246, 0.15);
+}
+/* Estado Activo (Seleccionado) */
+.email-sidebar-item.active {
+    background-color: rgba(59, 130, 246, 0.1);
+    border-left-color: #3b82f6;
+}
+.dark .email-sidebar-item.active {
+    background-color: rgba(30, 58, 138, 0.4);
+    border-left-color: #60a5fa;
+}
+
+/* Contenedor de Vista Previa (Simula Gmail/Outlook) */
+.email-preview-card {
+    background-color: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+    transition: all 0.3s ease;
+}
+.dark .email-preview-card {
+    background-color: #1f2937;
+    border-color: #374151;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
+}
+
+/* Inputs del Formulario Modernos */
+.input-modern {
+    transition: all 0.2s;
+    border: 1px solid transparent;
+}
+.input-modern:focus {
+    background-color: #fff;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+.dark .input-modern:focus {
+    background-color: #111827;
+    border-color: #60a5fa;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2);
+}
+
+/* Botón flotante para nueva plantilla */
+.btn-primary-shadow {
+    box-shadow: 0 10px 15px -3px rgba(37, 99, 235, 0.3);
+}
+.btn-primary-shadow:hover {
+    box-shadow: 0 10px 15px -3px rgba(37, 99, 235, 0.5);
+    transform: translateY(-1px);
+}
