@@ -519,10 +519,33 @@ async function saveCurrentTemplate() {
 function initEventListeners() {
     document.getElementById('login-form').addEventListener('submit', async (e) => {
         e.preventDefault();
+        
+        // Feedback visual de carga en el botón
+        const btn = e.target.querySelector('button');
+        const originalText = btn.innerText;
+        btn.innerText = "Conectando...";
+        btn.disabled = true;
+
         const email = document.getElementById('login-email').value;
         const password = document.getElementById('login-password').value;
-        const res = await authService.login(email, password);
-        if (!res.success) Swal.fire('Error de Acceso', 'Verifica credenciales.', 'error');
+        
+        try {
+            const res = await authService.login(email, password);
+            
+            if (!res.success) {
+                // AQUÍ ESTÁ EL CAMBIO CLAVE: Mostramos res.error en la alerta
+                Swal.fire({
+                    title: 'Error de Conexión', 
+                    text: res.error, // <--- Esto nos dirá la causa real
+                    icon: 'error'
+                });
+            }
+        } catch (err) {
+            Swal.fire('Error Crítico', err.message, 'error');
+        } finally {
+            btn.innerText = originalText;
+            btn.disabled = false;
+        }
     });
     
     document.getElementById('logout-btn').onclick = () => authService.logout();
