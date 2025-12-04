@@ -3,9 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>CRM Director - Ultimate Mobile</title>
+    <title>CRM Director - Ultimate</title>
     
-    <!-- 1. DEPENDENCIAS -->
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -21,73 +21,19 @@
             }
         }
     </script>
+    
+    <!-- Librerías Externas -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.2/Sortable.min.js"></script>
 
-    <style>
-        body { font-family: 'Segoe UI', system-ui, sans-serif; transition: background-color 0.3s, color 0.3s; }
-        
-        /* Glassmorphism */
-        .glass-panel {
-            background: rgba(255, 255, 255, 0.85);
-            backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 255, 255, 0.5);
-        }
-        .dark .glass-panel {
-            background: rgba(17, 24, 39, 0.85);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-        }
-
-        /* Scrollbar Personalizado */
-        ::-webkit-scrollbar { width: 6px; height: 6px; }
-        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
-        .dark ::-webkit-scrollbar-thumb { background: #4b5563; }
-
-        /* Animaciones */
-        .fade-in { animation: fadeIn 0.4s ease-out forwards; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        
-        /* Estilos Kanban */
-        .kanban-col { min-height: 200px; }
-        .sortable-ghost { opacity: 0.4; background: #e2e8f0; border: 2px dashed #94a3b8; }
-
-        /* Tooltip CSS Puro (Desktop) + Fix Móvil */
-        .tooltip-wrap { position: relative; }
-        .tooltip-wrap .tooltip-content {
-            visibility: hidden;
-            width: 280px;
-            background-color: #1e293b;
-            color: #fff;
-            text-align: left;
-            border-radius: 8px;
-            padding: 12px;
-            position: absolute;
-            z-index: 50;
-            bottom: 125%; 
-            left: 50%;
-            transform: translateX(-50%);
-            opacity: 0;
-            transition: opacity 0.3s, transform 0.3s;
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-            font-size: 0.8rem;
-            line-height: 1.4;
-            pointer-events: none;
-        }
-        /* Solo mostramos tooltip hover en pantallas que soportan hover (mouse) */
-        @media (hover: hover) {
-            .tooltip-wrap:hover .tooltip-content {
-                visibility: visible;
-                opacity: 1;
-                transform: translateX(-50%) translateY(-5px);
-            }
-        }
-    </style>
+    <!-- Estilos Personalizados -->
+    <link rel="stylesheet" href="css/style.css">
 </head>
-<body class="bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-100 min-h-screen selection:bg-brand-500 selection:text-white pb-20 lg:pb-0">
+<body class="bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-100 min-h-screen selection:bg-brand-500 selection:text-white">
 
-    <!-- === VISTA 1: LOGIN === -->
+    <!-- === VISTA LOGIN === -->
     <div id="login-view" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[url('https://images.unsplash.com/photo-1497215728101-856f4ea42174?ixlib=rb-1.2.1&auto=format&fit=crop&w=1950&q=80')] bg-cover bg-center">
         <div class="absolute inset-0 bg-brand-900/80 backdrop-blur-sm"></div>
         
@@ -97,581 +43,417 @@
                     <i class="fa-solid fa-chart-simple text-4xl text-white"></i>
                 </div>
                 <h2 class="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-brand-600 to-purple-600 dark:from-brand-400 dark:to-purple-400">CRM Director</h2>
-                <p class="text-gray-500 dark:text-gray-400 text-sm mt-2 font-medium">Panel de Control Inteligente</p>
+                <p class="text-gray-500 dark:text-gray-400 text-sm mt-2 font-medium">Acceso Seguro</p>
             </div>
             
             <form id="login-form" class="space-y-5">
                 <div class="relative">
                     <i class="fa-solid fa-envelope absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"></i>
-                    <input type="email" id="login-email" class="w-full pl-12 pr-4 py-4 rounded-xl bg-gray-50 dark:bg-gray-800 border-none focus:ring-2 focus:ring-brand-500 transition-all dark:text-white text-lg" value="admin@programbi.com" placeholder="Email" readonly>
+                    <input type="email" id="login-email" class="w-full pl-12 pr-4 py-4 rounded-xl bg-gray-50 dark:bg-gray-800 border-none focus:ring-2 focus:ring-brand-500 transition-all dark:text-white" placeholder="admin@empresa.com" required>
                 </div>
                 <div class="relative">
                     <i class="fa-solid fa-lock absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"></i>
-                    <input type="password" id="login-password" class="w-full pl-12 pr-4 py-4 rounded-xl bg-gray-50 dark:bg-gray-800 border-none focus:ring-2 focus:ring-brand-500 transition-all dark:text-white text-lg" value="password" placeholder="Contraseña">
+                    <input type="password" id="login-password" class="w-full pl-12 pr-4 py-4 rounded-xl bg-gray-50 dark:bg-gray-800 border-none focus:ring-2 focus:ring-brand-500 transition-all dark:text-white" placeholder="Contraseña" required>
                 </div>
-                <button type="submit" class="w-full bg-gradient-to-r from-brand-600 to-purple-600 hover:from-brand-700 hover:to-purple-700 text-white font-bold py-4 rounded-xl shadow-xl shadow-brand-500/20 transform hover:scale-[1.02] transition-all flex justify-center items-center gap-2 text-lg">
-                    <span>Entrar al Sistema</span>
-                    <i class="fa-solid fa-arrow-right"></i>
+                <button type="submit" class="w-full bg-gradient-to-r from-brand-600 to-purple-600 hover:from-brand-700 hover:to-purple-700 text-white font-bold py-4 rounded-xl shadow-xl shadow-brand-500/20 transform hover:scale-[1.02] transition-all">
+                    Entrar al Sistema
                 </button>
             </form>
         </div>
     </div>
 
-    <!-- === VISTA 2: DASHBOARD PRINCIPAL === -->
+    <!-- === VISTA DASHBOARD === -->
     <div id="dashboard-view" class="hidden min-h-screen flex flex-col transition-all duration-300">
         
-        <!-- Navbar -->
+        <!-- Navbar Superior -->
         <nav class="glass-panel sticky top-0 z-40 border-b shadow-sm">
             <div class="max-w-7xl mx-auto px-4 lg:px-8">
                 <div class="flex justify-between h-16 items-center">
+                    <!-- Logo & Modo -->
                     <div class="flex items-center gap-4">
                         <div class="flex items-center gap-2">
-                            <div class="bg-brand-600 text-white w-9 h-9 rounded-xl flex items-center justify-center font-bold text-xl shadow-md">D</div>
+                            <div class="bg-brand-600 text-white w-8 h-8 rounded-lg flex items-center justify-center font-bold text-lg">D</div>
                             <span class="font-bold text-lg tracking-tight hidden sm:block">Director<span class="text-brand-600 dark:text-brand-400">CRM</span></span>
                         </div>
-                        <div class="h-6 w-px bg-gray-300 dark:bg-gray-700 hidden sm:block"></div>
-                        <button id="theme-toggle" class="w-10 h-10 flex items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition text-gray-600 dark:text-gray-300 active:scale-95">
-                            <i class="fa-solid fa-moon dark:hidden text-lg"></i>
-                            <i class="fa-solid fa-sun hidden dark:block text-yellow-400 text-lg"></i>
+                        <div class="h-6 w-px bg-gray-300 dark:bg-gray-700"></div>
+                        <button id="theme-toggle" class="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition text-gray-600 dark:text-gray-300">
+                            <i class="fa-solid fa-moon dark:hidden"></i>
+                            <i class="fa-solid fa-sun hidden dark:block text-yellow-400"></i>
                         </button>
                     </div>
 
+                    <!-- Usuario & Acciones -->
                     <div class="flex items-center gap-3">
+                        <!-- Notificaciones Dropdown -->
+                        <div class="relative">
+                            <button id="notif-btn" class="relative p-2 text-gray-500 hover:text-brand-600 transition" title="Notificaciones">
+                                <i class="fa-regular fa-bell text-xl"></i>
+                                <span id="notif-badge" class="hidden absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
+                            </button>
+                            <!-- Panel Flotante -->
+                            <div id="notif-dropdown" class="hidden absolute right-0 mt-2 w-80 bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-100 dark:border-gray-700 overflow-hidden z-50">
+                                <div class="p-3 border-b dark:border-gray-700 bg-gray-50 dark:bg-gray-900 font-bold text-sm">Notificaciones Recientes</div>
+                                <div id="notif-list" class="max-h-64 overflow-y-auto"></div>
+                            </div>
+                        </div>
+
                         <div class="text-right hidden sm:block leading-tight">
                             <p class="text-[10px] text-gray-400 uppercase font-bold tracking-wider">Conectado como</p>
                             <p id="user-display" class="text-sm font-bold truncate max-w-[150px]">Admin</p>
                         </div>
-                        <button id="logout-btn" class="w-10 h-10 flex items-center justify-center bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-xl hover:bg-red-100 transition shadow-sm active:scale-95">
-                            <i class="fa-solid fa-power-off text-lg"></i>
+                        <button id="logout-btn" class="bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 p-2 rounded-lg hover:bg-red-100 transition shadow-sm" title="Cerrar Sesión">
+                            <i class="fa-solid fa-power-off"></i>
                         </button>
                     </div>
                 </div>
             </div>
         </nav>
 
-        <main class="flex-1 max-w-7xl w-full mx-auto p-3 sm:p-6 lg:p-8 space-y-6">
+        <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-8">
             
-            <!-- SECCIÓN KPIs -->
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-6">
-                <div class="lg:col-span-2 grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
-                    <div class="glass-panel p-4 rounded-2xl shadow-sm relative overflow-hidden group">
-                        <div class="absolute right-0 top-0 w-16 h-16 bg-brand-500/10 rounded-bl-full -mr-4 -mt-4"></div>
-                        <p class="text-gray-500 dark:text-gray-400 text-[10px] font-bold uppercase tracking-wider">Total Leads</p>
-                        <h3 id="kpi-total" class="text-3xl font-bold text-gray-800 dark:text-white mt-1">0</h3>
+            <!-- 1. KPIs & Gráfico -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Columna Izquierda: Tarjetas KPI -->
+                <div class="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <!-- Total -->
+                    <div class="glass-panel p-5 rounded-2xl shadow-sm relative overflow-hidden group">
+                        <div class="absolute right-0 top-0 w-24 h-24 bg-brand-500/10 rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110"></div>
+                        <div class="relative z-10">
+                            <p class="text-gray-500 dark:text-gray-400 text-xs font-bold uppercase tracking-wider">Total Leads</p>
+                            <div class="flex items-end gap-2 mt-1">
+                                <h3 id="kpi-total" class="text-4xl font-bold text-gray-800 dark:text-white">0</h3>
+                                <span class="text-xs text-green-500 font-medium mb-1.5"><i class="fa-solid fa-arrow-trend-up"></i> Global</span>
+                            </div>
+                        </div>
                     </div>
-                    <div class="glass-panel p-4 rounded-2xl shadow-sm border-l-4 border-yellow-400 relative overflow-hidden">
-                        <p class="text-gray-500 dark:text-gray-400 text-[10px] font-bold uppercase tracking-wider">Pendientes</p>
-                        <h3 id="kpi-pending" class="text-3xl font-bold text-yellow-600 dark:text-yellow-400 mt-1">0</h3>
+                    <!-- Pendientes (Urgente) -->
+                    <div class="glass-panel p-5 rounded-2xl shadow-sm border-l-4 border-yellow-400 relative overflow-hidden">
+                        <div class="absolute right-0 top-0 w-24 h-24 bg-yellow-500/10 rounded-bl-full -mr-4 -mt-4"></div>
+                        <div class="relative z-10">
+                            <p class="text-gray-500 dark:text-gray-400 text-xs font-bold uppercase tracking-wider">Por Contactar</p>
+                            <h3 id="kpi-pending" class="text-4xl font-bold text-yellow-600 dark:text-yellow-400 mt-1">0</h3>
+                        </div>
                     </div>
-                    <div class="glass-panel p-4 rounded-2xl shadow-sm border-l-4 border-green-500 relative overflow-hidden">
-                        <p class="text-gray-500 dark:text-gray-400 text-[10px] font-bold uppercase tracking-wider">Cerrados</p>
-                        <h3 id="kpi-contacted" class="text-3xl font-bold text-green-600 dark:text-green-400 mt-1">0</h3>
+                    <!-- Contactados -->
+                    <div class="glass-panel p-5 rounded-2xl shadow-sm border-l-4 border-green-500 relative overflow-hidden">
+                        <div class="absolute right-0 top-0 w-24 h-24 bg-green-500/10 rounded-bl-full -mr-4 -mt-4"></div>
+                        <div class="relative z-10">
+                            <p class="text-gray-500 dark:text-gray-400 text-xs font-bold uppercase tracking-wider">Cerrados</p>
+                            <h3 id="kpi-contacted" class="text-4xl font-bold text-green-600 dark:text-green-400 mt-1">0</h3>
+                        </div>
                     </div>
-                    <button id="export-btn" class="bg-gradient-to-br from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white rounded-2xl p-4 shadow-lg shadow-green-500/20 flex flex-col justify-center items-center gap-1 transition-all active:scale-95 group min-h-[80px]">
-                        <i class="fa-solid fa-file-csv text-2xl"></i>
-                        <span class="font-bold text-xs">Exportar</span>
+                    <!-- Acción Exportar -->
+                    <button id="export-btn" class="bg-gradient-to-br from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white rounded-2xl p-5 shadow-lg shadow-green-500/20 flex flex-col justify-center items-center gap-2 transition-all active:scale-95 group">
+                        <i class="fa-solid fa-file-excel text-2xl group-hover:animate-bounce"></i>
+                        <span class="font-bold text-sm">Exportar CSV</span>
                     </button>
                 </div>
 
-                <div class="glass-panel p-5 rounded-2xl shadow-sm h-48 lg:h-auto flex flex-col">
-                    <div class="flex justify-between items-center mb-2">
-                        <h4 class="font-bold text-xs text-gray-500 uppercase tracking-wide">Ingresos (7 días)</h4>
-                        <span class="text-[10px] bg-green-100 text-green-600 px-2 py-0.5 rounded-full">En vivo</span>
+                <!-- Columna Derecha: Gráfico de Tendencia -->
+                <div class="glass-panel p-5 rounded-2xl shadow-sm flex flex-col justify-between h-64 lg:h-auto">
+                    <div class="flex justify-between items-center mb-4">
+                        <h4 class="font-bold text-sm text-gray-700 dark:text-gray-200">Tendencia (7 días)</h4>
+                        <span class="text-xs text-brand-500 bg-brand-50 dark:bg-brand-900/30 px-2 py-1 rounded-md">En vivo</span>
                     </div>
-                    <div class="flex-1 relative w-full"><canvas id="trendChart"></canvas></div>
+                    <div class="flex-1 relative w-full h-full">
+                        <canvas id="trendChart"></canvas>
+                    </div>
                 </div>
             </div>
 
-            <!-- Barra de Control -->
-            <div class="flex flex-col lg:flex-row justify-between items-center gap-3 bg-white dark:bg-gray-800 p-3 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700">
-                <div class="relative w-full lg:w-auto">
-                    <i class="fa-solid fa-search absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"></i>
-                    <input type="text" id="search-input" placeholder="Buscar cliente..." class="w-full lg:w-72 pl-12 pr-4 py-3.5 rounded-xl bg-gray-50 dark:bg-gray-900 border-none focus:ring-2 focus:ring-brand-500 text-base dark:text-white transition-all shadow-sm">
-                </div>
+            <!-- 2. Barra de Control (Filtros & Vistas & Config Email) -->
+            <div class="flex flex-col lg:flex-row justify-between items-center gap-4 bg-white dark:bg-gray-800 p-2 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700">
                 
-                <div class="flex items-center gap-2 bg-gray-100 dark:bg-gray-900 p-1.5 rounded-xl w-full sm:w-auto overflow-x-auto">
-                    <button onclick="window.switchView('table')" id="btn-view-table" class="flex-1 sm:flex-none px-6 py-3 rounded-lg text-sm font-bold transition-all bg-white dark:bg-gray-700 text-brand-600 dark:text-white shadow-sm">
-                        <i class="fa-solid fa-table mr-2"></i>Tabla
+                <!-- Buscador y Filtros -->
+                <div class="flex flex-col sm:flex-row gap-2 w-full lg:w-auto flex-1">
+                    <div class="relative group">
+                        <i class="fa-solid fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-brand-500"></i>
+                        <input type="text" id="search-input" placeholder="Buscar lead..." class="w-full sm:w-48 pl-10 pr-4 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-900 border-none focus:ring-2 focus:ring-brand-500 text-sm dark:text-white transition-all">
+                    </div>
+                    <div class="relative">
+                         <i class="fa-regular fa-calendar absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                        <select id="filter-date" class="pl-10 pr-8 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-900 border-none focus:ring-2 focus:ring-brand-500 text-sm dark:text-white cursor-pointer appearance-none">
+                            <option value="all">Toda la historia</option>
+                            <option value="today">Hoy</option>
+                            <option value="week">Esta Semana</option>
+                            <option value="month">Este Mes</option>
+                        </select>
+                    </div>
+                    <div class="relative">
+                        <i class="fa-solid fa-graduation-cap absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                        <select id="filter-course" class="pl-10 pr-8 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-900 border-none focus:ring-2 focus:ring-brand-500 text-sm dark:text-white cursor-pointer appearance-none">
+                            <option value="all">Todos los cursos</option>
+                            <!-- Se poblará dinámicamente si es necesario, o estático -->
+                            <option value="Power BI">Power BI</option>
+                            <option value="Python">Python</option>
+                            <option value="SQL">SQL</option>
+                            <option value="Excel">Excel</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Botones de Acción -->
+                <div class="flex items-center gap-2 w-full sm:w-auto justify-end">
+                    <!-- BOTÓN NUEVO: Configuración de Plantillas -->
+                    <button id="btn-config-email" class="px-4 py-2.5 rounded-xl bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 text-sm font-bold hover:bg-indigo-100 transition flex items-center gap-2">
+                        <i class="fa-solid fa-robot"></i> <span class="hidden sm:inline">Plantillas & Auto</span>
                     </button>
-                    <button onclick="window.switchView('kanban')" id="btn-view-kanban" class="flex-1 sm:flex-none px-6 py-3 rounded-lg text-sm font-bold text-gray-500 hover:text-gray-700 dark:text-gray-400 transition-all">
-                        <i class="fa-solid fa-border-all mr-2"></i>Kanban
+
+                    <div class="h-6 w-px bg-gray-300 dark:bg-gray-700 mx-1"></div>
+
+                    <!-- Vistas -->
+                    <div class="flex bg-gray-100 dark:bg-gray-900 p-1 rounded-xl">
+                        <button id="btn-view-table" class="px-4 py-2 rounded-lg text-sm font-medium transition-all shadow-sm bg-white dark:bg-gray-700 text-brand-600 dark:text-white">
+                            <i class="fa-solid fa-table mr-2"></i>Tabla
+                        </button>
+                        <button id="btn-view-kanban" class="px-4 py-2 rounded-lg text-sm font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 transition-all">
+                            <i class="fa-solid fa-border-all mr-2"></i>Kanban
+                        </button>
+                    </div>
+                    <button id="btn-trash" class="ml-2 px-3 py-2.5 rounded-xl text-gray-400 hover:text-red-500 hover:bg-red-50 transition tooltip" title="Papelera">
+                        <i class="fa-solid fa-trash-can"></i>
                     </button>
-                    <button onclick="window.toggleTrash()" id="btn-trash" class="ml-2 w-11 h-11 flex items-center justify-center rounded-lg text-gray-400 hover:text-red-500 transition active:scale-95 bg-white dark:bg-gray-800 shadow-sm" title="Papelera"><i class="fa-solid fa-trash-can text-lg"></i></button>
                 </div>
             </div>
 
-            <!-- Contenedor Vistas -->
+            <!-- 3. Contenedor de Vistas -->
             <div class="relative min-h-[400px]">
                 
                 <!-- VISTA TABLA -->
                 <div id="view-table" class="fade-in glass-panel rounded-2xl shadow-sm overflow-hidden flex flex-col">
                     <div class="overflow-x-auto">
-                        <table class="w-full text-left border-collapse min-w-[800px] lg:min-w-0">
+                        <table class="w-full text-left border-collapse">
                             <thead class="bg-gray-50/50 dark:bg-gray-800/50 text-gray-500 dark:text-gray-400 text-xs uppercase font-bold border-b border-gray-100 dark:border-gray-700">
                                 <tr>
-                                    <th class="p-4">Lead / Fecha</th>
+                                    <th class="p-4">Score</th>
                                     <th class="p-4">Contacto</th>
-                                    <th class="p-4 w-48">Mensaje</th>
-                                    <th class="p-4 text-center w-40">Próx. Llamada</th>
+                                    <th class="p-4">Interés</th>
                                     <th class="p-4 text-center">Estado</th>
-                                    <th class="p-4 text-center">Nota</th>
+                                    <th class="p-4 text-center">Notas</th>
                                     <th class="p-4 text-center">Acciones</th>
                                 </tr>
                             </thead>
                             <tbody id="table-body" class="text-sm divide-y divide-gray-100 dark:divide-gray-800">
-                                <!-- JS Injected -->
+                                <!-- Filas JS -->
                             </tbody>
                         </table>
                     </div>
                 </div>
 
                 <!-- VISTA KANBAN -->
-                <div id="view-kanban" class="hidden grid grid-cols-1 md:grid-cols-3 gap-4 lg:gap-6 h-full pb-4">
-                    <div class="flex flex-col h-full bg-gray-50 dark:bg-gray-800/50 rounded-2xl p-3 border border-gray-200 dark:border-gray-700">
-                        <h3 class="font-bold text-gray-700 dark:text-gray-200 mb-3 pb-2 border-b border-gray-200 dark:border-gray-600 flex justify-between items-center">
-                            <span><i class="fa-regular fa-clock text-yellow-500 mr-2"></i>Pendientes</span>
-                            <span id="count-kanban-pendiente" class="text-xs font-bold bg-white dark:bg-gray-700 px-2 py-1 rounded-lg shadow-sm">0</span>
-                        </h3>
-                        <div id="kanban-pendiente" class="kanban-col flex-1 space-y-3" data-status="pendiente"></div>
+                <div id="view-kanban" class="hidden grid grid-cols-1 md:grid-cols-3 gap-6 h-full overflow-x-auto pb-4">
+                    <!-- Columnas Kanban se generan aquí -->
+                    <div class="flex flex-col h-full bg-gray-50 dark:bg-gray-800/50 rounded-2xl p-4 border border-gray-200 dark:border-gray-700">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="font-bold text-gray-700 dark:text-gray-200"><i class="fa-regular fa-clock text-yellow-500 mr-2"></i>Pendientes</h3>
+                            <span id="count-kanban-pending" class="bg-gray-200 dark:bg-gray-700 text-xs px-2 py-1 rounded-full font-bold">0</span>
+                        </div>
+                        <div id="kanban-pending" class="kanban-col flex-1 space-y-3" data-status="pendiente"></div>
                     </div>
-                    <div class="flex flex-col h-full bg-gray-50 dark:bg-gray-800/50 rounded-2xl p-3 border border-gray-200 dark:border-gray-700">
-                        <h3 class="font-bold text-gray-700 dark:text-gray-200 mb-3 pb-2 border-b border-gray-200 dark:border-gray-600 flex justify-between items-center">
-                            <span><i class="fa-solid fa-spinner text-blue-500 mr-2"></i>Seguimiento</span>
-                            <span id="count-kanban-seguimiento" class="text-xs font-bold bg-white dark:bg-gray-700 px-2 py-1 rounded-lg shadow-sm">0</span>
-                        </h3>
-                        <div id="kanban-seguimiento" class="kanban-col flex-1 space-y-3" data-status="seguimiento"></div>
+                    
+                    <div class="flex flex-col h-full bg-gray-50 dark:bg-gray-800/50 rounded-2xl p-4 border border-gray-200 dark:border-gray-700">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="font-bold text-gray-700 dark:text-gray-200"><i class="fa-solid fa-spinner text-blue-500 mr-2"></i>Seguimiento</h3>
+                             <span id="count-kanban-progress" class="bg-gray-200 dark:bg-gray-700 text-xs px-2 py-1 rounded-full font-bold">0</span>
+                        </div>
+                        <div id="kanban-progress" class="kanban-col flex-1 space-y-3" data-status="seguimiento"></div>
                     </div>
-                    <div class="flex flex-col h-full bg-gray-50 dark:bg-gray-800/50 rounded-2xl p-3 border border-gray-200 dark:border-gray-700">
-                        <h3 class="font-bold text-gray-700 dark:text-gray-200 mb-3 pb-2 border-b border-gray-200 dark:border-gray-600 flex justify-between items-center">
-                            <span><i class="fa-solid fa-check-circle text-green-500 mr-2"></i>Cerrados</span>
-                            <span id="count-kanban-contactado" class="text-xs font-bold bg-white dark:bg-gray-700 px-2 py-1 rounded-lg shadow-sm">0</span>
-                        </h3>
-                        <div id="kanban-contactado" class="kanban-col flex-1 space-y-3" data-status="contactado"></div>
+
+                    <div class="flex flex-col h-full bg-gray-50 dark:bg-gray-800/50 rounded-2xl p-4 border border-gray-200 dark:border-gray-700">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="font-bold text-gray-700 dark:text-gray-200"><i class="fa-solid fa-check-circle text-green-500 mr-2"></i>Cerrados</h3>
+                             <span id="count-kanban-contacted" class="bg-gray-200 dark:bg-gray-700 text-xs px-2 py-1 rounded-full font-bold">0</span>
+                        </div>
+                        <div id="kanban-contacted" class="kanban-col flex-1 space-y-3" data-status="contactado"></div>
                     </div>
                 </div>
-
             </div>
         </main>
     </div>
 
-    <!-- === LÓGICA DEL SISTEMA (JS) === -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-        import { getFirestore, collection, query, orderBy, onSnapshot, doc, updateDoc, deleteDoc, Timestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-
-        const firebaseConfig = {
-            apiKey: "AIzaSyDVlTFLAX1Ya28uoqQ-mqTFFakHxQ3GgVI",
-            authDomain: "crm-programbi-9934a.firebaseapp.com",
-            projectId: "crm-programbi-9934a",
-            storageBucket: "crm-programbi-9934a.firebasestorage.app",
-            messagingSenderId: "646856396244",
-            appId: "1:646856396244:web:6caacd7c27b644f087da41"
-        };
-
-        let app, auth, db;
-        try {
-            app = initializeApp(firebaseConfig);
-            auth = getAuth(app);
-            db = getFirestore(app);
-        } catch(e) { console.error("Firebase Init Error:", e); }
-
-        let allLeads = [];
-        let isTrashMode = false;
-        let currentView = 'table';
-        let trendChartInstance = null;
-
-        onAuthStateChanged(auth, (user) => {
-            if (user) {
-                document.getElementById('login-view').classList.add('hidden');
-                document.getElementById('dashboard-view').classList.remove('hidden');
-                initDataListener();
-            } else {
-                document.getElementById('dashboard-view').classList.add('hidden');
-                document.getElementById('login-view').classList.remove('hidden');
-            }
-        });
-
-        document.getElementById('login-form').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const btn = e.target.querySelector('button');
-            const originalContent = btn.innerHTML;
-            btn.disabled = true;
-            btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Conectando...';
-            try { await signInAnonymously(auth); } 
-            catch (err) {
-                Swal.fire({icon:'error', title:'Error de Conexión', text: err.message});
-                btn.disabled = false;
-                btn.innerHTML = originalContent;
-            }
-        });
-
-        document.getElementById('logout-btn').addEventListener('click', () => signOut(auth));
-
-        function initDataListener() {
-            const q = query(collection(db, "leads"), orderBy("fecha", "desc")); 
+    <!-- === MODAL CONFIGURACIÓN DE EMAILS (REDISEÑADO) === -->
+    <div id="email-config-modal" class="hidden fixed inset-0 z-[60] flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm transition-opacity duration-300">
+        <div class="bg-white dark:bg-gray-900 w-full max-w-6xl h-[85vh] rounded-2xl shadow-2xl overflow-hidden flex flex-col border border-gray-200 dark:border-gray-700 animate-[fadeIn_0.3s_ease-out]">
             
-            onSnapshot(q, (snapshot) => {
-                allLeads = [];
-                const last7Days = Array(7).fill(0);
-                
-                snapshot.forEach(docSnap => {
-                    const data = docSnap.data();
-                    const lead = { 
-                        id: docSnap.id, 
-                        nombre: data.nombre || 'Sin Nombre',
-                        email: data.email || '',
-                        telefono: data.telefono || '', 
-                        curso_interes: Array.isArray(data.intereses) ? data.intereses.join(", ") : (data.intereses || 'General'),
-                        status: data.status || 'pendiente',
-                        fecha: data.fecha || data.fecha_creacion,
-                        observaciones: data.observaciones || '',
-                        mensaje: data.mensaje || '', 
-                        proxima_llamada: data.proxima_llamada
-                    };
-                    allLeads.push(lead);
+            <!-- Header Modal -->
+            <div class="px-6 py-4 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center bg-white dark:bg-gray-900 z-10">
+                <div class="flex items-center gap-3">
+                    <div class="p-2 bg-indigo-50 dark:bg-indigo-900/30 rounded-lg text-indigo-600 dark:text-indigo-400">
+                        <i class="fa-solid fa-wand-magic-sparkles text-lg"></i>
+                    </div>
+                    <div>
+                        <h2 class="text-xl font-bold text-gray-800 dark:text-white leading-tight">Gestor de Respuestas</h2>
+                        <p class="text-xs text-gray-500 dark:text-gray-400">Automatiza tus comunicaciones por curso</p>
+                    </div>
+                </div>
+                <button id="btn-close-modal" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full">
+                    <i class="fa-solid fa-times text-xl"></i>
+                </button>
+            </div>
 
-                    if (lead.fecha) {
-                        try {
-                            const date = lead.fecha.toDate();
-                            const diffDays = Math.floor((new Date() - date) / (1000 * 60 * 60 * 24));
-                            if (diffDays < 7 && diffDays >= 0) last7Days[6 - diffDays]++;
-                        } catch(e) {}
-                    }
-                });
-                updateKPIs();
-                updateChart(last7Days);
-                renderApp();
-            });
-        }
+            <div class="flex flex-1 overflow-hidden">
+                <!-- Sidebar: Lista -->
+                <div class="w-1/4 min-w-[250px] bg-gray-50 dark:bg-gray-900/50 border-r border-gray-200 dark:border-gray-800 flex flex-col">
+                    <div class="p-4">
+                        <button id="btn-new-template" class="w-full py-3 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-bold shadow-lg shadow-brand-500/20 transition flex items-center justify-center gap-2 group">
+                            <i class="fa-solid fa-plus group-hover:rotate-90 transition"></i> Nueva Plantilla
+                        </button>
+                    </div>
+                    <div class="px-4 pb-2">
+                        <p class="text-xs font-bold text-gray-400 uppercase tracking-wider">Tus Plantillas</p>
+                    </div>
+                    <div id="templates-list" class="flex-1 overflow-y-auto px-2 pb-4 space-y-1">
+                        <!-- Lista generada por JS -->
+                    </div>
+                </div>
 
-        window.switchView = (view) => {
-            currentView = view;
-            document.getElementById('view-table').classList.toggle('hidden', view !== 'table');
-            document.getElementById('view-kanban').classList.toggle('hidden', view !== 'kanban');
-            const btnTable = document.getElementById('btn-view-table');
-            const btnKanban = document.getElementById('btn-view-kanban');
-            // Botones más grandes y claros
-            if (view === 'table') {
-                btnTable.className = "flex-1 sm:flex-none px-6 py-3 rounded-lg text-sm font-bold transition-all bg-white dark:bg-gray-700 text-brand-600 dark:text-white shadow-sm ring-1 ring-brand-200 dark:ring-gray-600 transform scale-105";
-                btnKanban.className = "flex-1 sm:flex-none px-6 py-3 rounded-lg text-sm font-bold text-gray-500 hover:text-gray-700 dark:text-gray-400 transition-all";
-            } else {
-                btnTable.className = "flex-1 sm:flex-none px-6 py-3 rounded-lg text-sm font-bold text-gray-500 hover:text-gray-700 dark:text-gray-400 transition-all";
-                btnKanban.className = "flex-1 sm:flex-none px-6 py-3 rounded-lg text-sm font-bold transition-all bg-white dark:bg-gray-700 text-brand-600 dark:text-white shadow-sm ring-1 ring-brand-200 dark:ring-gray-600 transform scale-105";
-            }
-            renderApp();
-        };
-
-        window.toggleTrash = () => {
-            isTrashMode = !isTrashMode;
-            const btn = document.getElementById('btn-trash');
-            btn.classList.toggle('text-red-500', isTrashMode);
-            btn.classList.toggle('bg-red-50', isTrashMode);
-            btn.classList.toggle('ring-2', isTrashMode);
-            btn.classList.toggle('ring-red-200', isTrashMode);
-            renderApp();
-        };
-
-        window.toggleStatus = async (id, current) => {
-            const flow = { 'pendiente': 'seguimiento', 'seguimiento': 'contactado', 'contactado': 'pendiente' };
-            await updateDoc(doc(db, "leads", id), { status: flow[current] || 'pendiente' });
-        };
-
-        window.scheduleCall = async (id, currentVal) => {
-            let defaultDate = '';
-            if(currentVal) {
-                 const d = new Date(currentVal.seconds * 1000);
-                 d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
-                 defaultDate = d.toISOString().slice(0, 16);
-            }
-
-            const { value: dateStr } = await Swal.fire({
-                title: '📅 Agendar Llamada',
-                html: `<input type="datetime-local" id="swal-date" class="swal2-input w-full p-3 text-lg" value="${defaultDate}">`,
-                showCancelButton: true,
-                confirmButtonText: 'Guardar',
-                cancelButtonText: 'Cancelar',
-                customClass: { popup: 'rounded-2xl' }, // Mejora visual en móvil
-                preConfirm: () => {
-                    return document.getElementById('swal-date').value;
-                }
-            });
-
-            if (dateStr) {
-                const newDate = new Date(dateStr);
-                await updateDoc(doc(db, "leads", id), { 
-                    proxima_llamada: Timestamp.fromDate(newDate),
-                    status: 'seguimiento'
-                });
-                Swal.fire({toast:true, icon:'success', title:'Agenda actualizada', position:'top-end', timer:2000, showConfirmButton:false});
-            }
-        };
-
-        window.editNote = async (id, current) => {
-            const {value:text} = await Swal.fire({
-                input: 'textarea', 
-                inputValue: current, 
-                title: 'Nota Interna',
-                placeholder: 'Escribe notas privadas...',
-                customClass: { input: 'h-32 text-lg' }
-            });
-            if(text !== undefined) await updateDoc(doc(db,"leads",id), {observaciones:text});
-        };
-        
-        // Helper para mostrar mensajes completos en móvil al tocar
-        window.showFullMessage = (text) => {
-             Swal.fire({
-                 title: 'Mensaje del Cliente',
-                 text: text,
-                 confirmButtonText: 'Cerrar',
-                 customClass: { popup: 'rounded-2xl' }
-             });
-        };
-
-        window.openEmail = (email, name, course) => {
-            if (!email) return Swal.fire('Sin email', '', 'info');
-            Swal.fire({
-                title: 'Email: Elegir Plantilla',
-                input: 'select',
-                inputOptions: { 'bienvenida': '👋 Bienvenida', 'temario': '📄 Envío de Temario', 'empresa': '🏢 Cotización Empresa' },
-                inputPlaceholder: 'Selecciona asunto...',
-                showCancelButton: true,
-                confirmButtonText: 'Siguiente',
-                customClass: { input: 'h-12 text-lg' }
-            }).then((res) => {
-                if(res.isConfirmed && res.value) {
-                    const templates = {
-                        bienvenida: { subject: `Bienvenido a ProgramBI - Curso ${course}`, body: `Hola ${name},\n\nGracias por tu interés en ${course}.` },
-                        temario: { subject: `Información Curso ${course}`, body: `Hola ${name},\n\nAdjunto información del curso.` },
-                        empresa: { subject: `Propuesta - ${course}`, body: `Estimado/a ${name},\n\nGracias por cotizar.` }
-                    };
-                    const sel = templates[res.value];
-                    window.location.href = `mailto:${email}?subject=${encodeURIComponent(sel.subject)}&body=${encodeURIComponent(sel.body)}`;
-                }
-            });
-        };
-
-        window.moveToTrash = async (id) => {
-            await updateDoc(doc(db, "leads", id), { status: 'trashed' });
-            Swal.fire({toast:true, icon:'success', title:'Movido a papelera', position:'bottom-end', showConfirmButton:false, timer:1000});
-        };
-        
-        window.restoreLead = async (id) => {
-            await updateDoc(doc(db, "leads", id), { status: 'pendiente' });
-            Swal.fire({toast:true, icon:'success', title:'Restaurado', position:'bottom-end', showConfirmButton:false, timer:1000});
-        };
-        
-        window.hardDelete = async (id) => {
-            if((await Swal.fire({title:'¿Eliminar definitivamente?', icon:'warning', showCancelButton:true, confirmButtonColor:'#d33', confirmButtonText: 'Borrar', cancelButtonText: 'Cancelar'})).isConfirmed) {
-                await deleteDoc(doc(db, "leads", id));
-            }
-        };
-
-        window.openWA = (phone, name) => {
-            if(!phone) return Swal.fire({toast:true, icon:'info', title:'Sin teléfono'});
-            let clean = phone.replace(/\D/g, '');
-            if(clean.length === 9) clean = '56' + clean; 
-            window.open(`https://wa.me/${clean}?text=${encodeURIComponent(`Hola ${name}, te contacto de ProgramBI.`)}`, '_blank');
-        };
-
-        document.getElementById('export-btn').addEventListener('click', () => {
-             let csv = "Fecha,Nombre,Email,Telefono,Curso,Estado,Próxima Llamada,Mensaje Cliente,Notas Internas\n";
-             allLeads.forEach(l => {
-                 const date = l.fecha && l.fecha.toDate ? l.fecha.toDate().toLocaleDateString() : '--';
-                 const nextCall = l.proxima_llamada && l.proxima_llamada.toDate ? l.proxima_llamada.toDate().toLocaleString() : '';
-                 const msg = (l.mensaje || '').replace(/(\r\n|\n|\r)/gm, " ");
-                 const obs = (l.observaciones || '').replace(/(\r\n|\n|\r)/gm, " ");
-                 csv += `${date},${l.nombre},${l.email},${l.telefono},"${l.curso_interes}",${l.status},"${nextCall}","${msg}","${obs}"\n`;
-             });
-             const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-             const link = document.createElement("a");
-             link.href = URL.createObjectURL(blob);
-             link.download = "leads_programbi.csv";
-             link.click();
-        });
-
-        window.renderApp = () => {
-            const term = document.getElementById('search-input').value.toLowerCase();
-            const filtered = allLeads.filter(l => {
-                if (isTrashMode && l.status !== 'trashed') return false;
-                if (!isTrashMode && l.status === 'trashed') return false;
-                return (l.nombre.toLowerCase().includes(term) || l.email.toLowerCase().includes(term));
-            });
-            if(currentView === 'table') renderTable(filtered);
-            else renderKanban(filtered);
-        };
-
-        function renderTable(leads) {
-            const tbody = document.getElementById('table-body');
-            tbody.innerHTML = '';
-            
-            if(leads.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="8" class="p-8 text-center text-gray-400">No se encontraron leads</td></tr>`;
-                return;
-            }
-
-            leads.forEach(lead => {
-                const dateStr = lead.fecha && lead.fecha.toDate ? lead.fecha.toDate().toLocaleDateString('es-CL', {day:'2-digit', month:'short'}) : '--';
-                
-                // Botón de notas (Más Grande: w-11 h-11)
-                const noteBtnClass = lead.observaciones ? "text-yellow-600 bg-yellow-100 ring-1 ring-yellow-200" : "text-gray-400 bg-gray-100 hover:bg-gray-200";
-                
-                // Formato Próxima Llamada (Botón grande)
-                let nextCallHTML = `<span class="text-gray-400 text-xs italic">--</span>`;
-                let nextCallVal = null;
-                if(lead.proxima_llamada && lead.proxima_llamada.toDate) {
-                    const d = lead.proxima_llamada.toDate();
-                    nextCallVal = lead.proxima_llamada; 
-                    const isToday = new Date().toDateString() === d.toDateString();
-                    const colorClass = isToday ? "text-red-600 bg-red-50 border-red-100 animate-pulse font-bold" : "text-brand-600 bg-brand-50 border-brand-100";
-                    nextCallHTML = `<div class="${colorClass} px-3 py-2 rounded-lg border flex flex-col items-center justify-center min-w-[100px]"><span class="text-xs uppercase font-bold text-gray-400 mb-0.5">${d.getDate()}/${d.getMonth()+1}</span><span class="text-sm font-bold">${d.getHours()}:${String(d.getMinutes()).padStart(2,'0')}</span></div>`;
-                } else {
-                    nextCallHTML = `<div class="w-10 h-10 rounded-lg bg-gray-50 flex items-center justify-center text-gray-300 hover:text-brand-500 transition"><i class="fa-regular fa-calendar-plus text-lg"></i></div>`;
-                }
-
-                // Mensaje (Lógica Híbrida Desktop/Mobile)
-                const hasMessage = lead.mensaje && lead.mensaje.length > 0;
-                // En móvil, agregamos onclick para mostrar el mensaje completo
-                const msgClickAction = hasMessage ? `onclick="window.showFullMessage('${lead.mensaje.replace(/'/g, "\\'")}')"` : '';
-                const messagePreview = hasMessage ? lead.mensaje : '<span class="text-gray-300 italic">Sin mensaje</span>';
-
-                const tr = document.createElement('tr');
-                tr.className = "hover:bg-gray-50 dark:hover:bg-gray-800 transition border-b border-gray-100 dark:border-gray-700 group";
-                
-                tr.innerHTML = `
-                    <td class="p-4">
-                        <div class="font-bold text-base text-gray-800 dark:text-gray-100 mb-1">${lead.nombre}</div>
-                        <div class="text-xs text-gray-400 font-mono bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded w-max">${dateStr}</div>
-                    </td>
-                    <td class="p-4 text-sm">
-                        <div class="flex flex-col gap-2">
-                            <div class="text-gray-600 dark:text-gray-300 flex items-center gap-3 cursor-pointer hover:text-brand-500 p-1" onclick="navigator.clipboard.writeText('${lead.email}')" title="Copiar Email">
-                                <i class="fa-solid fa-envelope text-gray-400"></i>${lead.email}
-                            </div>
-                            ${lead.telefono ? `<div class="text-gray-600 dark:text-gray-300 flex items-center gap-3 p-1"><i class="fa-solid fa-phone text-gray-400"></i>${lead.telefono}</div>` : ''}
-                        </div>
-                    </td>
+                <!-- Main: Editor y Preview -->
+                <div class="flex-1 flex flex-col lg:flex-row h-full overflow-hidden bg-white dark:bg-gray-900">
                     
-                    <!-- COLUMNA MENSAJE (Tooltip + OnClick Mobile) -->
-                    <td class="p-4 tooltip-wrap" ${msgClickAction}>
-                        <div class="truncate w-40 text-sm text-gray-600 dark:text-gray-400 cursor-pointer border-l-4 border-transparent hover:border-brand-300 pl-3 transition-all">
-                            ${messagePreview}
+                    <!-- Estado Vacío (Inicial) -->
+                    <div id="template-empty-state" class="w-full h-full flex flex-col items-center justify-center text-gray-400 p-8 text-center">
+                        <div class="w-24 h-24 bg-gray-50 dark:bg-gray-800 rounded-full flex items-center justify-center mb-4">
+                            <i class="fa-regular fa-paper-plane text-4xl text-gray-300 dark:text-gray-600"></i>
                         </div>
-                        ${hasMessage ? `<div class="tooltip-content shadow-xl">${lead.mensaje}</div>` : ''}
-                    </td>
-
-                    <!-- COLUMNA PRÓXIMA LLAMADA -->
-                    <td class="p-4 text-center">
-                        <button onclick="window.scheduleCall('${lead.id}', ${nextCallVal ? JSON.stringify(nextCallVal).replace(/"/g, "'") : 'null'})" class="hover:bg-gray-100 dark:hover:bg-gray-700 p-1 rounded-xl transition border border-transparent hover:border-gray-200">
-                            ${nextCallHTML}
-                        </button>
-                    </td>
-
-                    <td class="p-4 text-center cursor-pointer select-none" onclick="window.toggleStatus('${lead.id}', '${lead.status}')">
-                        <span class="px-4 py-2 rounded-lg text-xs font-extrabold uppercase tracking-wide transition transform hover:scale-105 inline-block shadow-sm ${getStatusColor(lead.status)}">
-                            ${lead.status}
-                        </span>
-                    </td>
-                    <td class="p-4 text-center">
-                        <button onclick="window.editNote('${lead.id}', '${(lead.observaciones||'').replace(/'/g, "\\'")}')" class="${noteBtnClass} w-11 h-11 flex items-center justify-center rounded-xl transition shadow-sm active:scale-95 mx-auto" title="Notas Internas">
-                            <i class="fa-solid fa-note-sticky text-lg"></i>
-                        </button>
-                    </td>
-                    <td class="p-4 text-center">
-                        <div class="flex justify-center gap-3">
-                            ${!isTrashMode ? `
-                                <button onclick="window.openEmail('${lead.email}', '${lead.nombre}', '${lead.curso_interes}')" class="w-11 h-11 rounded-xl bg-indigo-50 text-indigo-600 hover:bg-indigo-500 hover:text-white transition flex items-center justify-center shadow-sm active:scale-95" title="Email"><i class="fa-solid fa-envelope text-lg"></i></button>
-                                <button onclick="window.openWA('${lead.telefono}', '${lead.nombre}')" class="w-11 h-11 rounded-xl bg-green-50 text-green-600 hover:bg-green-500 hover:text-white transition flex items-center justify-center shadow-sm active:scale-95" title="WhatsApp"><i class="fab fa-whatsapp text-xl"></i></button>
-                                <button onclick="window.moveToTrash('${lead.id}')" class="w-11 h-11 rounded-xl bg-gray-50 text-gray-400 hover:bg-red-50 hover:text-red-500 transition flex items-center justify-center shadow-sm active:scale-95" title="Borrar"><i class="fa-solid fa-trash text-lg"></i></button>
-                            ` : `
-                                <button onclick="window.restoreLead('${lead.id}')" class="w-11 h-11 rounded-xl bg-green-50 text-green-500 flex items-center justify-center shadow-sm" title="Restaurar"><i class="fa-solid fa-trash-arrow-up text-lg"></i></button>
-                                <button onclick="window.hardDelete('${lead.id}')" class="w-11 h-11 rounded-xl bg-red-50 text-red-600 flex items-center justify-center shadow-sm" title="Eliminar"><i class="fa-solid fa-xmark text-xl"></i></button>
-                            `}
-                        </div>
-                    </td>
-                `;
-                tbody.appendChild(tr);
-            });
-        }
-
-        function renderKanban(leads) {
-            const cols = { pendiente: document.getElementById('kanban-pendiente'), seguimiento: document.getElementById('kanban-seguimiento'), contactado: document.getElementById('kanban-contactado') };
-            Object.keys(cols).forEach(key => {
-                cols[key].innerHTML = '';
-                document.getElementById(`count-kanban-${key}`).textContent = leads.filter(l => l.status === key).length;
-            });
-            leads.forEach(lead => {
-                const col = cols[lead.status] || cols['pendiente'];
-                const card = document.createElement('div');
-                card.className = "bg-white dark:bg-gray-800 p-4 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-600 cursor-grab active:cursor-grabbing hover:shadow-md transition mb-3 relative group";
-                card.setAttribute('data-id', lead.id);
-                
-                let callBadge = '';
-                if(lead.proxima_llamada && lead.proxima_llamada.toDate) {
-                    const d = lead.proxima_llamada.toDate();
-                    callBadge = `<div class="mt-3 text-xs bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 px-3 py-1.5 rounded-lg inline-flex items-center font-bold w-full justify-center"><i class="fa-regular fa-clock mr-2"></i> ${d.getDate()}/${d.getMonth()+1} - ${d.getHours()}:${String(d.getMinutes()).padStart(2,'0')}</div>`;
-                }
-
-                card.innerHTML = `
-                    <div class="flex justify-between items-start mb-2">
-                        <h4 class="font-bold text-base text-gray-800 dark:text-gray-100 line-clamp-1">${lead.nombre}</h4>
-                        <span class="text-[10px] text-gray-400 bg-gray-50 dark:bg-gray-700 px-2 py-1 rounded-md font-mono">${lead.fecha && lead.fecha.toDate ? lead.fecha.toDate().getDate() + '/' + (lead.fecha.toDate().getMonth()+1) : ''}</span>
+                        <h3 class="text-lg font-medium text-gray-600 dark:text-gray-300">Selecciona una plantilla</h3>
+                        <p class="text-sm max-w-xs mt-2">Configura los correos que se enviarán cuando hagas clic en un lead.</p>
                     </div>
-                    <div class="text-sm text-gray-500 dark:text-gray-400 mb-3 truncate font-medium text-brand-600 dark:text-brand-400">${lead.curso_interes}</div>
-                    ${callBadge}
-                    <div class="flex justify-between items-center border-t border-gray-100 dark:border-gray-700 pt-3 mt-3">
-                        <button onclick="window.openEmail('${lead.email}', '${lead.nombre}', '${lead.curso_interes}')" class="text-indigo-500 bg-indigo-50 hover:bg-indigo-100 w-10 h-10 flex items-center justify-center rounded-xl transition"><i class="fa-solid fa-envelope"></i></button>
-                        <div class="flex gap-2">
-                            <button onclick="window.scheduleCall('${lead.id}')" class="text-gray-500 bg-gray-100 hover:bg-gray-200 w-10 h-10 flex items-center justify-center rounded-xl transition"><i class="fa-regular fa-calendar-plus"></i></button>
-                            <button onclick="window.openWA('${lead.telefono}', '${lead.nombre}')" class="text-green-600 bg-green-50 hover:bg-green-100 w-10 h-10 flex items-center justify-center rounded-xl transition"><i class="fab fa-whatsapp text-lg"></i></button>
+
+                    <!-- Panel Editor (Oculto inicialmente) -->
+                    <div id="template-editor" class="hidden w-full h-full flex flex-col lg:flex-row">
+                        
+                        <!-- Columna 1: Formulario -->
+                        <div class="w-full lg:w-1/2 p-6 overflow-y-auto border-r border-gray-100 dark:border-gray-800">
+                            <div class="space-y-5">
+                                <!-- Trigger (MODIFICADO: AHORA ES UN SELECT) -->
+                                <div class="bg-blue-50 dark:bg-blue-900/10 p-4 rounded-xl border border-blue-100 dark:border-blue-900/20">
+                                    <label class="block text-xs font-bold text-blue-600 dark:text-blue-400 uppercase mb-2">
+                                        <i class="fa-solid fa-filter mr-1"></i> Trigger (Disparador)
+                                    </label>
+                                    
+                                    <!-- SELECT MEJORADO -->
+                                    <select id="tpl-course" class="w-full bg-white dark:bg-gray-800 border-none rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 font-medium input-modern">
+                                        <option value="" disabled selected>Selecciona una opción...</option>
+                                        
+                                        <optgroup label="Especiales">
+                                            <option value="Manual">⛔ Manual (Solo envío manual)</option>
+                                            <option value="Todos los Cursos">🌐 Todos los Cursos (Por defecto)</option>
+                                        </optgroup>
+
+                                        <optgroup label="Cursos del Sistema">
+                                            <option value="Power BI">Power BI</option>
+                                            <option value="Python">Python</option>
+                                            <option value="Excel Avanzado">Excel Avanzado</option>
+                                            <option value="SQL Server">SQL Server</option>
+                                            <option value="Big Data">Big Data</option>
+                                            <option value="Machine Learning">Machine Learning</option>
+                                            <option value="Inteligencia Artificial">Inteligencia Artificial</option>
+                                        </optgroup>
+                                    </select>
+                                    
+                                    <p class="text-[10px] text-blue-400 mt-2 leading-tight">
+                                        Elige "Manual" si no quieres que esta plantilla se sugiera automáticamente.
+                                    </p>
+                                </div>
+
+                                <!-- Datos del Correo -->
+                                <div>
+                                    <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Asunto</label>
+                                    <input type="text" id="tpl-subject" class="w-full bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition outline-none font-medium input-modern" placeholder="Bienvenido al curso...">
+                                </div>
+                                
+                                <div>
+                                    <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Enlace PDF / Recurso</label>
+                                    <div class="relative">
+                                        <i class="fa-solid fa-link absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                                        <input type="url" id="tpl-link" class="w-full pl-10 pr-4 py-3 bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none text-blue-600 dark:text-blue-400 input-modern" placeholder="https://...">
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <div class="flex justify-between items-center mb-1">
+                                        <label class="block text-xs font-bold text-gray-500 uppercase">Mensaje</label>
+                                        <span class="text-[10px] text-gray-400 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded">Usa <b>{nombre}</b> para personalizar</span>
+                                    </div>
+                                    <textarea id="tpl-body" rows="8" class="w-full bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 rounded-lg p-4 text-sm focus:ring-2 focus:ring-brand-500 outline-none leading-relaxed resize-none input-modern" placeholder="Hola..."></textarea>
+                                </div>
+
+                                <!-- Opciones -->
+                                <div class="flex items-center justify-between pt-2">
+                                    <label class="flex items-center gap-3 cursor-pointer group">
+                                        <div class="relative">
+                                            <input type="checkbox" id="tpl-auto" class="sr-only peer">
+                                            <div class="w-10 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-500"></div>
+                                        </div>
+                                        <span class="text-sm font-medium text-gray-600 dark:text-gray-300 group-hover:text-gray-900 dark:group-hover:text-white transition">Marcar como Preferida (Auto)</span>
+                                    </label>
+                                </div>
+                            </div>
+                            
+                            <!-- Botonera -->
+                            <div class="flex gap-3 mt-8 pt-4 border-t border-gray-100 dark:border-gray-800">
+                                <button id="btn-delete-template" class="px-4 py-2.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg text-sm font-bold transition flex items-center gap-2">
+                                    <i class="fa-regular fa-trash-can"></i> Eliminar
+                                </button>
+                                <div class="flex-1"></div>
+                                <button id="btn-save-template" class="px-6 py-2.5 bg-gray-900 dark:bg-white text-white dark:text-gray-900 hover:bg-gray-800 dark:hover:bg-gray-100 rounded-xl text-sm font-bold shadow-lg transition transform active:scale-95 flex items-center gap-2">
+                                    <i class="fa-solid fa-save"></i> Guardar Plantilla
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Columna 2: Vista Previa Real -->
+                        <div class="w-full lg:w-1/2 bg-gray-100 dark:bg-black/20 p-6 flex flex-col overflow-hidden">
+                            <h4 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+                                <i class="fa-solid fa-eye"></i> Vista Previa (Simulada)
+                            </h4>
+                            
+                            <!-- Email Preview Card -->
+                            <div class="email-preview-card flex-1 p-6 flex flex-col shadow-sm">
+                                <div class="border-b border-gray-100 dark:border-gray-700 pb-4 mb-4 space-y-2">
+                                    <div class="flex gap-2 text-sm">
+                                        <span class="text-gray-400 w-12 text-right">Para:</span>
+                                        <span class="text-gray-800 dark:text-gray-200 font-medium bg-gray-100 dark:bg-gray-700 px-2 rounded text-xs flex items-center">cliente@ejemplo.com</span>
+                                    </div>
+                                    <div class="flex gap-2 text-sm">
+                                        <span class="text-gray-400 w-12 text-right">Asunto:</span>
+                                        <span id="preview-subject" class="text-gray-800 dark:text-gray-100 font-bold">Sin asunto</span>
+                                    </div>
+                                </div>
+                                
+                                <div class="flex-1 overflow-y-auto">
+                                    <div id="preview-body" class="text-sm text-gray-600 dark:text-gray-300 whitespace-pre-wrap leading-relaxed">
+                                        Escribe en el formulario para ver cómo quedará el correo...
+                                    </div>
+                                    
+                                    <!-- Attachment Preview -->
+                                    <div id="preview-attachment" class="hidden mt-6 p-3 border border-gray-200 dark:border-gray-700 rounded-lg flex items-center gap-3 bg-gray-50 dark:bg-gray-800/50 max-w-xs cursor-not-allowed opacity-80">
+                                        <div class="w-8 h-10 bg-red-100 dark:bg-red-900/30 flex items-center justify-center rounded text-red-500">
+                                            <i class="fa-solid fa-file-pdf"></i>
+                                        </div>
+                                        <div class="overflow-hidden">
+                                            <p class="text-xs font-bold text-gray-700 dark:text-gray-200 truncate">Temario Adjunto.pdf</p>
+                                            <p class="text-[10px] text-gray-400">1.2 MB</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700 flex justify-between items-center text-xs text-gray-400">
+                                    <span>Firma Automática</span>
+                                    <i class="fa-solid fa-shield-halved"></i>
+                                </div>
+                            </div>
                         </div>
                     </div>
-                `;
-                col.appendChild(card);
-            });
-            Object.values(cols).forEach(el => new Sortable(el, { group: 'kanban', animation: 150, ghostClass: 'sortable-ghost', onEnd: async (evt) => {
-                const id = evt.item.getAttribute('data-id');
-                const status = evt.to.getAttribute('data-status');
-                if(id && status) await updateDoc(doc(db, "leads", id), { status });
-            }}));
-        }
+                </div>
+            </div>
+        </div>
+        <!-- Cierre al hacer click fuera -->
+        <div id="modal-backdrop-close" class="absolute inset-0 -z-10"></div>
+    </div>
 
-        function getStatusColor(s) {
-            if(s==='contactado') return 'bg-green-100 text-green-700 border border-green-200';
-            if(s==='seguimiento') return 'bg-blue-100 text-blue-700 border border-blue-200';
-            return 'bg-yellow-100 text-yellow-700 border border-yellow-200';
-        }
+    <!-- Lógica Principal -->
+    <script type="module" src="js/app-crm.js"></script>
 
-        function updateKPIs() {
-            const active = allLeads.filter(l => l.status !== 'trashed');
-            document.getElementById('kpi-total').textContent = active.length;
-            document.getElementById('kpi-pending').textContent = active.filter(l => l.status === 'pendiente').length;
-            document.getElementById('kpi-contacted').textContent = active.filter(l => l.status === 'contactado').length;
-        }
-
-        function updateChart(data) {
-            const ctx = document.getElementById('trendChart').getContext('2d');
-            if(trendChartInstance) trendChartInstance.destroy();
-            trendChartInstance = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: ['Hace 6d','Hace 5d','Hace 4d','Hace 3d','Anteayer','Ayer','Hoy'],
-                    datasets: [{ 
-                        data, borderColor: '#3b82f6', borderWidth: 3, pointBackgroundColor: '#fff', pointBorderColor: '#3b82f6', pointRadius: 4, tension: 0.4, fill: true, 
-                        backgroundColor: (c) => {
-                            const grad = c.chart.ctx.createLinearGradient(0, 0, 0, 200);
-                            grad.addColorStop(0, 'rgba(59, 130, 246, 0.2)');
-                            grad.addColorStop(1, 'rgba(59, 130, 246, 0)');
-                            return grad;
-                        }
-                    }]
-                },
-                options: { responsive: true, maintainAspectRatio: false, plugins: {legend:{display:false}, tooltip:{mode:'index', intersect:false}}, scales:{x:{display:false}, y:{display:false}} }
-            });
-        }
-
-        document.getElementById('search-input').addEventListener('keyup', renderApp);
-        document.getElementById('theme-toggle').addEventListener('click', () => document.documentElement.classList.toggle('dark'));
-    </script>
 </body>
 </html>
