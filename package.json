@@ -2,6 +2,7 @@
   "name": "crm-director-backend",
   "version": "1.0.0",
   "dependencies": {
+    "firebase": "^10.7.1",
     "node-fetch": "^3.3.2"
   }
 }
