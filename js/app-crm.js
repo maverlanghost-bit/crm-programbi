@@ -1,11 +1,11 @@
 // ==========================================
-// CONTROLADOR PRINCIPAL (MAIN APP LOGIC) - V2 CON SYNC SHOPIFY
+// CONTROLADOR PRINCIPAL (MAIN APP LOGIC) - V3 FINAL
 // ==========================================
 
 import { authService, leadsService, templatesService } from "./firebase-db.js";
 
 // --- CONFIGURACIÓN ---
-// URL de tu API en Vercel que conecta con Shopify
+// Asegúrate de que esta URL sea correcta y tu proyecto Vercel esté activo
 const SHOPIFY_API_URL = "https://crm-programbi.vercel.app/api/create-customer"; 
 
 // === ESTADO DE LA APLICACIÓN ===
@@ -28,6 +28,7 @@ const state = {
 document.addEventListener('DOMContentLoaded', () => {
     initAuthListener();
     initEventListeners();
+    injectSyncButton(); // Inyectar botón manual
 });
 
 function initAuthListener() {
@@ -52,9 +53,9 @@ function subscribeToData() {
         state.leads = data;
         renderApp();
         
-        // --- MOTOR DE SINCRONIZACIÓN (El "Gerente") ---
-        // Detecta automáticamente leads que están en Firebase pero faltan en Shopify
-        syncPendingLeadsToShopify(data); 
+        // Intentar sincronización automática silenciosa
+        // (Solo si hay nuevos pendientes)
+        syncPendingLeadsToShopify(data, true); 
     });
 
     // 2. Suscripción a Plantillas
@@ -65,46 +66,55 @@ function subscribeToData() {
     });
 }
 
-// === AUTOMATIZACIÓN SHOPIFY (NUEVO) ===
-async function syncPendingLeadsToShopify(leads) {
-    // Buscar leads que NO están en papelera y tienen status de shopify 'pending'
+// === LÓGICA DE SINCRONIZACIÓN SHOPIFY (NÚCLEO) ===
+async function syncPendingLeadsToShopify(leads, silent = false) {
+    // 1. Filtrar leads que necesitan ir a Shopify
+    // Deben no estar borrados y tener status 'pending' O 'error_network' (para reintentar)
     const pendingLeads = leads.filter(l => 
         l.status !== 'trashed' && 
-        (l.shopify_status === 'pending')
+        (l.shopify_status === 'pending' || l.shopify_status === 'error_network')
     );
 
-    if (pendingLeads.length === 0) return;
+    if (pendingLeads.length === 0) {
+        if(!silent) Swal.fire('Todo al día', 'No hay leads pendientes de sincronizar.', 'success');
+        return;
+    }
 
-    // Notificación discreta (Toast)
-    const Toast = Swal.mixin({
-        toast: true, position: 'bottom-end', showConfirmButton: false, timer: 3000,
-        didOpen: (toast) => { toast.onmouseenter = Swal.stopTimer; toast.onmouseleave = Swal.resumeTimer; }
-    });
+    if (!silent) {
+        Swal.fire({
+            title: 'Sincronizando...',
+            text: `Procesando ${pendingLeads.length} leads con Shopify`,
+            didOpen: () => Swal.showLoading()
+        });
+    } else {
+        console.log(`🔄 Auto-Sync: ${pendingLeads.length} leads detectados.`);
+    }
 
-    Toast.fire({
-        icon: 'info',
-        title: `Sincronizando ${pendingLeads.length} leads con Shopify...`
-    });
+    let successCount = 0;
+    let errorCount = 0;
 
-    console.log(`🔄 Iniciando sincronización de ${pendingLeads.length} leads...`);
-
-    // Procesar uno por uno para seguridad
+    // 2. Procesar Cola
     for (const lead of pendingLeads) {
         try {
-            // Preparar Tags e Intereses
-            const intereses = Array.isArray(lead.intereses) ? lead.intereses : [lead.curso_interes || 'General'];
-            const tagsIntereses = intereses.map(i => `curso-${String(i).toLowerCase().replace(/\s+/g, '-')}`).join(', ');
+            // Normalizar intereses para tags
+            const rawIntereses = Array.isArray(lead.intereses) ? lead.intereses : [lead.curso_interes || 'General'];
+            // Limpiar tags: espacios a guiones, minusculas
+            const tagsIntereses = rawIntereses.map(i => {
+                return `curso-${String(i).toLowerCase().trim().replace(/\s+/g, '-')}`;
+            }).join(', ');
             
             const payload = {
-                nombre: lead.nombre,
+                nombre: lead.nombre || 'Sin Nombre',
                 email: lead.email,
-                telefono: lead.telefono,
-                // Tags para Shopify: origen, sistema y cursos
-                tags: `lead-web-v2, crm-sync, ${tagsIntereses}`,
-                nota: `Empresa: ${lead.empresa || 'N/A'}\nIntereses: ${intereses.join(', ')}\nMensaje: ${lead.mensaje || ''}\nOrigen: ${lead.origen || 'Web'}`
+                telefono: lead.telefono || '',
+                // Tags formateados para Shopify
+                tags: `lead-web, crm-sync, ${tagsIntereses}`, 
+                nota: `Empresa: ${lead.empresa || 'N/A'}\nIntereses: ${rawIntereses.join(', ')}\nMensaje: ${lead.mensaje || ''}\nOrigen: ${lead.origen || 'Web'}`
             };
 
-            // Llamada a tu API Vercel
+            console.log(`📤 Enviando a Vercel [${lead.email}]:`, payload);
+
+            // Fetch a Vercel
             const res = await fetch(SHOPIFY_API_URL, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -114,26 +124,57 @@ async function syncPendingLeadsToShopify(leads) {
             const result = await res.json();
 
             if (res.ok) {
-                // ÉXITO: Actualizamos Firebase para que deje de ser 'pending'
+                // ÉXITO
                 await leadsService.update(lead.id, { 
                     shopify_status: 'synced',
                     shopify_id: result.customer?.id || 'synced-ok',
                     shopify_synced_at: new Date()
                 });
-                console.log(`✅ Lead ${lead.email} sincronizado.`);
+                successCount++;
+                console.log(`✅ Éxito: ${lead.email}`);
             } else {
-                // ERROR CONTROLADO: Marcamos error para no reintentar infinitamente en bucle
-                console.error('Shopify Error:', result);
+                // ERROR DE API (Shopify rechazó datos, ej: email inválido)
+                console.error('❌ Shopify rechazó:', result);
                 await leadsService.update(lead.id, { 
                     shopify_status: 'error', 
                     shopify_error: JSON.stringify(result) 
                 });
+                errorCount++;
             }
 
         } catch (error) {
-            console.error(`❌ Error de red con lead ${lead.email}:`, error);
-            // No actualizamos status en Firebase para que reintente en la próxima recarga
+            // ERROR DE RED (Vercel caído, CORS, Sin Internet)
+            console.error(`❌ Error de RED con ${lead.email}:`, error);
+            await leadsService.update(lead.id, { 
+                shopify_status: 'error_network', 
+                shopify_error: error.message 
+            });
+            errorCount++;
         }
+    }
+
+    if (!silent) {
+        Swal.fire({
+            title: 'Sincronización Terminada',
+            html: `Enviados: <b>${successCount}</b><br>Errores: <b style="color:red">${errorCount}</b>`,
+            icon: errorCount > 0 ? 'warning' : 'success'
+        });
+    }
+}
+
+// === HELPER: BOTÓN MANUAL ===
+function injectSyncButton() {
+    // Busca la barra de herramientas
+    const toolbar = document.querySelector('.flex.items-center.gap-2.w-full.sm\\:w-auto.justify-end');
+    if(toolbar && !document.getElementById('btn-manual-sync')) {
+        const btn = document.createElement('button');
+        btn.id = 'btn-manual-sync';
+        btn.className = "px-4 py-2.5 rounded-xl bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 text-sm font-bold hover:bg-green-100 transition flex items-center gap-2 mr-2";
+        btn.innerHTML = '<i class="fa-solid fa-arrows-rotate"></i> <span class="hidden sm:inline">Sincronizar</span>';
+        btn.onclick = () => syncPendingLeadsToShopify(state.leads, false);
+        
+        // Insertar al principio de la barra
+        toolbar.prepend(btn);
     }
 }
 
@@ -159,6 +200,7 @@ function renderApp() {
     updateTrashButtonState();
 }
 
+// ... (Resto de funciones auxiliares iguales: updateTrashButtonState, toggleTrashBanner, filterLeads) ...
 function updateTrashButtonState() {
     const trashBtn = document.getElementById('btn-trash');
     if (state.trashMode) {
@@ -185,7 +227,6 @@ function toggleTrashBanner() {
     state.trashMode ? banner.classList.remove('hidden') : banner.classList.add('hidden');
 }
 
-// === FILTROS ===
 function filterLeads() {
     return state.leads.filter(lead => {
         if (state.trashMode) { if (lead.status !== 'trashed') return false; } 
@@ -196,7 +237,6 @@ function filterLeads() {
         const leadEmail = (lead.email || '').toLowerCase();
         const matchText = leadName.includes(searchText) || leadEmail.includes(searchText);
         
-        // Match course unificado (array o string)
         let leadInterestsStr = "";
         if(Array.isArray(lead.intereses)) leadInterestsStr = lead.intereses.join(' ').toLowerCase();
         else leadInterestsStr = (lead.curso_interes || '').toLowerCase();
@@ -217,7 +257,7 @@ function filterLeads() {
     });
 }
 
-// === RENDERIZADO TABLA ===
+// === RENDERIZADO TABLA (ACTUALIZADO CON ICONOS DE ERROR) ===
 function renderTable(leads) {
     const tbody = document.getElementById('table-body');
     tbody.innerHTML = '';
@@ -238,23 +278,24 @@ function renderTable(leads) {
             const hasTemplate = !!matchingTemplate;
             const isSent = lead.emailSent || false;
             
-            // Icono de Shopify
+            // LÓGICA DE ICONOS SHOPIFY MEJORADA
             let shopifyIcon = '';
             if (lead.shopify_status === 'synced') {
-                shopifyIcon = '<i class="fa-brands fa-shopify text-green-500 text-lg" title="Sincronizado en Shopify"></i>';
+                shopifyIcon = '<i class="fa-brands fa-shopify text-green-500 text-lg" title="Sincronizado OK"></i>';
             } else if (lead.shopify_status === 'error') {
-                shopifyIcon = '<i class="fa-brands fa-shopify text-red-500 text-lg cursor-help" title="Error de Sincronización (Ver Consola)"></i>';
+                // Error de API (Shopify dijo no)
+                shopifyIcon = '<i class="fa-solid fa-circle-xmark text-red-500 text-lg cursor-help" title="Shopify rechazó los datos (Ver Consola)"></i>';
+            } else if (lead.shopify_status === 'error_network') {
+                // Error de Red (No se pudo conectar)
+                shopifyIcon = '<i class="fa-solid fa-wifi text-orange-500 text-lg cursor-help" title="Error de Conexión con Vercel/Shopify"></i>';
             } else if (lead.shopify_status === 'pending') {
-                shopifyIcon = '<i class="fa-solid fa-arrows-rotate fa-spin text-blue-400 text-lg" title="Sincronizando..."></i>';
+                shopifyIcon = '<i class="fa-solid fa-arrows-rotate fa-spin text-blue-400 text-lg" title="Intentando sincronizar..."></i>';
             } else {
-                // Leads viejos sin status
                 shopifyIcon = '<i class="fa-brands fa-shopify text-gray-200 text-lg" title="No sincronizado"></i>';
             }
 
-            // Botón Email
             let btnClass = isSent ? "bg-blue-100 text-blue-600 border border-blue-300" : "bg-gray-100 text-gray-500 hover:bg-gray-200 hover:text-gray-700";
             
-            // Intereses Display
             let interesesDisplay = lead.curso_interes || 'General';
             if(Array.isArray(lead.intereses) && lead.intereses.length > 0) {
                 interesesDisplay = lead.intereses.slice(0, 2).join(', ') + (lead.intereses.length > 2 ? '...' : '');
@@ -307,6 +348,8 @@ function renderTable(leads) {
     attachDynamicListeners();
 }
 
+// ... (El resto de funciones como renderKanban, findBestTemplate, etc. permanecen igual que en tu versión anterior, solo asegúrate de que el archivo termine correctamente) ...
+
 // === RENDERIZADO KANBAN ===
 function renderKanban(leads) {
     const cols = {
@@ -318,7 +361,6 @@ function renderKanban(leads) {
     if(!cols.pendiente) return; 
     Object.values(cols).forEach(c => c.innerHTML = '');
 
-    // Actualizar contadores
     document.getElementById('count-kanban-pending').innerText = leads.filter(l => l.status === 'pendiente').length;
     document.getElementById('count-kanban-progress').innerText = leads.filter(l => l.status === 'seguimiento').length;
     document.getElementById('count-kanban-contacted').innerText = leads.filter(l => l.status === 'contactado').length;
@@ -331,10 +373,10 @@ function renderKanban(leads) {
         
         let interesesDisplay = Array.isArray(lead.intereses) ? lead.intereses[0] : (lead.curso_interes || 'General');
 
-        // Icono Shopify en Kanban
         let shopifyStatusClass = 'text-gray-300';
         if(lead.shopify_status === 'synced') shopifyStatusClass = 'text-green-500';
         if(lead.shopify_status === 'error') shopifyStatusClass = 'text-red-500';
+        if(lead.shopify_status === 'error_network') shopifyStatusClass = 'text-orange-500';
 
         card.innerHTML = `
             <div class="flex justify-between items-start mb-2">
@@ -351,7 +393,7 @@ function renderKanban(leads) {
             </div>
         `;
         
-        if (lead.status === 'trashed') cols['pendiente'].appendChild(card); // Fallback visual
+        if (lead.status === 'trashed') cols['pendiente'].appendChild(card);
         else col.appendChild(card);
     });
 
@@ -368,13 +410,9 @@ function renderKanban(leads) {
     });
 }
 
-// === PLANTILLAS & EMAILS ===
 function findBestTemplate(lead) {
     if (!lead) return null;
-    // Lógica robusta para array de intereses o string simple
     const interests = Array.isArray(lead.intereses) ? lead.intereses : [lead.curso_interes];
-    
-    // Buscar coincidencia en cualquiera de los intereses
     for(let interest of interests) {
         if(!interest) continue;
         const cleanInterest = String(interest).toLowerCase().trim();
@@ -390,16 +428,12 @@ function findBestTemplate(lead) {
 function handleSmartEmail(leadId) {
     const lead = state.leads.find(l => l.id === leadId);
     if(!lead) return;
-
     const template = findBestTemplate(lead);
-
     if (template) {
         let rawBody = template.body.replace(/{nombre}/g, (lead.nombre || '').split(' ')[0]); 
         if (template.pdfLink) rawBody += `\n\nTemario: ${template.pdfLink}`;
-        
-        const body = rawBody.replace(/\n/g, "\r\n"); // Fix Outlook
+        const body = rawBody.replace(/\n/g, "\r\n"); 
         const mailtoLink = `mailto:${lead.email}?subject=${encodeURIComponent(template.subject)}&body=${encodeURIComponent(body)}`;
-        
         Swal.fire({
             title: 'Vista Previa',
             html: `<div class="text-left text-xs p-4 bg-gray-50 border rounded whitespace-pre-wrap">${rawBody}</div>`,
@@ -414,12 +448,10 @@ function handleSmartEmail(leadId) {
             }
         });
     } else {
-        // Fallback sin plantilla
         window.location.href = `mailto:${lead.email}`;
     }
 }
 
-// === GESTIÓN DE PLANTILLAS (UI) ===
 function openEmailConfigModal() {
     document.getElementById('email-config-modal').classList.remove('hidden');
     renderTemplatesList();
@@ -429,12 +461,10 @@ function openEmailConfigModal() {
 function renderTemplatesList() {
     const container = document.getElementById('templates-list');
     container.innerHTML = '';
-    
     if (state.templates.length === 0) {
         container.innerHTML = '<div class="p-4 text-xs text-gray-400 text-center">Sin plantillas</div>';
         return;
     }
-
     state.templates.forEach(tpl => {
         const div = document.createElement('div');
         div.className = `email-sidebar-item p-3 rounded-lg cursor-pointer flex justify-between items-center mb-1 ${state.activeTemplateId === tpl.id ? 'active' : ''}`;
@@ -448,15 +478,12 @@ function loadTemplateEditor(tpl) {
     state.activeTemplateId = tpl ? tpl.id : null;
     document.getElementById('template-editor').classList.remove('hidden');
     document.getElementById('template-empty-state').classList.add('hidden');
-
     document.getElementById('tpl-course').value = tpl ? tpl.courseName : '';
     document.getElementById('tpl-subject').value = tpl ? tpl.subject : '';
     document.getElementById('tpl-link').value = tpl ? tpl.pdfLink : '';
     document.getElementById('tpl-body').value = tpl ? tpl.body : '';
     document.getElementById('tpl-auto').checked = tpl ? tpl.autoSend : false;
-    
     updatePreview();
-
     const delBtn = document.getElementById('btn-delete-template');
     if (tpl) {
         delBtn.classList.remove('hidden');
@@ -480,7 +507,6 @@ function resetEditor() {
 function updatePreview() {
     document.getElementById('preview-subject').textContent = document.getElementById('tpl-subject').value || 'Asunto';
     document.getElementById('preview-body').textContent = document.getElementById('tpl-body').value || 'Cuerpo del correo...';
-    
     const link = document.getElementById('tpl-link').value;
     const att = document.getElementById('preview-attachment');
     if(link) { att.classList.remove('hidden'); att.classList.add('flex'); }
@@ -490,7 +516,6 @@ function updatePreview() {
 async function saveCurrentTemplate() {
     const btn = document.getElementById('btn-save-template');
     btn.innerHTML = 'Guardando...'; btn.disabled = true;
-
     const data = {
         courseName: document.getElementById('tpl-course').value,
         subject: document.getElementById('tpl-subject').value,
@@ -498,7 +523,6 @@ async function saveCurrentTemplate() {
         body: document.getElementById('tpl-body').value,
         autoSend: document.getElementById('tpl-auto').checked
     };
-
     try {
         await templatesService.save(state.activeTemplateId, data);
         Swal.fire({toast: true, icon: 'success', title: 'Guardado', position: 'top-end', timer: 1500});
@@ -507,9 +531,7 @@ async function saveCurrentTemplate() {
     finally { btn.innerHTML = '<i class="fa-solid fa-save"></i> Guardar Plantilla'; btn.disabled = false; }
 }
 
-// === LISTENERS GENERALES ===
 function initEventListeners() {
-    // Login
     document.getElementById('login-form').addEventListener('submit', async (e) => {
         e.preventDefault();
         const res = await authService.login(
@@ -519,30 +541,22 @@ function initEventListeners() {
         if (!res.success) Swal.fire('Error', 'Credenciales incorrectas', 'error');
     });
     document.getElementById('logout-btn').onclick = () => authService.logout();
-
-    // Filtros
     document.getElementById('search-input').onkeyup = (e) => { state.filters.search = e.target.value; renderApp(); };
     document.getElementById('filter-date').onchange = (e) => { state.filters.date = e.target.value; renderApp(); };
     document.getElementById('filter-course').onchange = (e) => { state.filters.course = e.target.value; renderApp(); };
-    
-    // Vistas
     document.getElementById('btn-view-table').onclick = () => { state.view = 'table'; renderApp(); };
     document.getElementById('btn-view-kanban').onclick = () => { state.view = 'kanban'; renderApp(); };
     document.getElementById('btn-trash').onclick = () => { state.trashMode = !state.trashMode; renderApp(); };
-
-    // Modal Email
     document.getElementById('btn-config-email').onclick = openEmailConfigModal;
     document.getElementById('modal-backdrop-close').onclick = () => document.getElementById('email-config-modal').classList.add('hidden');
     document.getElementById('btn-close-modal').onclick = () => document.getElementById('email-config-modal').classList.add('hidden');
     document.getElementById('btn-new-template').onclick = () => loadTemplateEditor(null);
     document.getElementById('btn-save-template').onclick = saveCurrentTemplate;
-
     ['tpl-subject', 'tpl-body', 'tpl-link'].forEach(id => {
         document.getElementById(id)?.addEventListener('keyup', updatePreview);
     });
 }
 
-// === HELPERS ===
 function updateKPIs(leads) {
     const active = leads.filter(l => l.status !== 'trashed');
     document.getElementById('kpi-total').textContent = active.length;
@@ -553,15 +567,12 @@ function updateKPIs(leads) {
 function updateChart(leads) {
     const ctx = document.getElementById('trendChart')?.getContext('2d');
     if(!ctx) return;
-    
     const labels = [], dataPoints = [];
     for(let i=6; i>=0; i--) {
         const d = new Date(); d.setDate(d.getDate() - i);
         labels.push(d.toLocaleDateString('es', {weekday:'short'}));
-        
         const dayStart = new Date(d.setHours(0,0,0,0));
         const dayEnd = new Date(d.setHours(23,59,59,999));
-        
         const count = leads.filter(l => {
             if(!l.fecha) return false;
             const ld = l.fecha.toDate();
@@ -569,7 +580,6 @@ function updateChart(leads) {
         }).length;
         dataPoints.push(count);
     }
-
     if(state.chartInstance) state.chartInstance.destroy();
     state.chartInstance = new Chart(ctx, {
         type: 'line',
@@ -583,7 +593,6 @@ function updateViewButtons() {
     const btnKanban = document.getElementById('btn-view-kanban');
     const activeClass = "px-4 py-2 rounded-lg text-sm font-bold bg-brand-600 text-white shadow-sm transition";
     const inactiveClass = "px-4 py-2 rounded-lg text-sm font-medium text-gray-500 hover:bg-gray-100 transition";
-    
     btnTable.className = state.view === 'table' ? activeClass : inactiveClass;
     btnKanban.className = state.view === 'kanban' ? activeClass : inactiveClass;
 }
