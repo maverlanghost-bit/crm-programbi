@@ -1,5 +1,5 @@
 // ==========================================
-// CONTROLADOR PRINCIPAL (MASTER V6 - FINAL)
+// CONTROLADOR PRINCIPAL (MASTER V7 - SYNC REFORZADO)
 // ==========================================
 
 import { authService, leadsService, templatesService } from "./firebase-db.js";
@@ -18,7 +18,7 @@ const state = {
         date: 'all',
         course: 'all'
     },
-    trashMode: false, // false = Ver Activos, true = Ver Papelera
+    trashMode: false,
     chartInstance: null,
     activeTemplateId: null 
 };
@@ -27,7 +27,6 @@ const state = {
 document.addEventListener('DOMContentLoaded', () => {
     initAuthListener();
     initEventListeners();
-    // Inyectar botón de sincronización manual después de cargar
     setTimeout(injectManualSyncButton, 1500);
 });
 
@@ -53,8 +52,8 @@ function subscribeToData() {
         state.leads = data;
         renderApp();
         
-        // AUTO-SYNC: Sincronizar automáticamente lo nuevo
-        // (Solo procesa lo que está pendiente, no reintenta errores antiguos para evitar bucles)
+        // AUTO-SYNC MEJORADO: Atrapa 'pending' Y también los que no tienen estado (null/undefined)
+        // Esto soluciona el problema de que los leads viejos se ignoren.
         syncNewLeadsOnly(data); 
     });
 
@@ -68,27 +67,28 @@ function subscribeToData() {
 // === MOTOR DE SINCRONIZACIÓN (SHOPIFY) ===
 
 async function syncNewLeadsOnly(leads) {
-    // Solo intentar sync automático de lo que dice 'pending' explícitamente
+    // Filtro más permisivo: Sincroniza si es 'pending' O si no tiene estado definido.
     const leadsToSync = leads.filter(l => 
-        l.status !== 'trashed' && l.shopify_status === 'pending'
+        l.status !== 'trashed' && 
+        (l.shopify_status === 'pending' || !l.shopify_status)
     );
 
     if (leadsToSync.length > 0) {
-        console.log(`⚡ Auto-Sync: Procesando ${leadsToSync.length} nuevos leads...`);
-        runBatchSync(leadsToSync, true); // true = modo silencioso (sin alertas)
+        console.log(`⚡ Auto-Sync: Procesando ${leadsToSync.length} leads...`);
+        runBatchSync(leadsToSync, true); // Silencioso
     }
 }
 
 async function runBatchSync(leads, silent = false) {
     if (leads.length === 0) {
-        if(!silent) Swal.fire('Estado', 'No hay leads seleccionados para sincronizar.', 'info');
+        if(!silent) Swal.fire('Estado', 'No hay leads pendientes de sincronizar.', 'info');
         return;
     }
 
     if (!silent) {
         Swal.fire({
-            title: 'Sincronizando...',
-            html: `Enviando <b>${leads.length}</b> contactos a Shopify.`,
+            title: 'Conectando con Shopify...',
+            html: `Enviando <b>${leads.length}</b> contactos.<br>Por favor espera...`,
             didOpen: () => Swal.showLoading()
         });
     }
@@ -98,15 +98,17 @@ async function runBatchSync(leads, silent = false) {
 
     for (const lead of leads) {
         try {
-            // Data Cleaning
+            // Data Cleaning Robusto
             const intereses = Array.isArray(lead.intereses) ? lead.intereses : [lead.curso_interes || 'General'];
-            const tags = intereses.map(i => `curso-${String(i).toLowerCase().trim().replace(/\s+/g, '-')}`).join(', ');
+            // Limpiamos tags agresivamente para evitar rechazos de Shopify
+            const tags = intereses.map(i => 
+                `curso-${String(i).toLowerCase().trim().replace(/[^a-z0-9]+/g, '-')}`
+            ).join(', ');
             
             const payload = {
                 nombre: lead.nombre || 'Desconocido',
                 email: lead.email,
                 telefono: lead.telefono || '',
-                // Tags para Shopify
                 tags: `lead-web, crm-sync, ${tags}`,
                 nota: `Empresa: ${lead.empresa || 'N/A'}\nMensaje: ${lead.mensaje || ''}\nOrigen: ${lead.origen || 'Web'}`
             };
@@ -117,10 +119,16 @@ async function runBatchSync(leads, silent = false) {
                 body: JSON.stringify(payload)
             });
 
-            const result = await res.json();
+            // Manejo de respuesta seguro (evita crash si Vercel devuelve HTML de error)
+            const text = await res.text();
+            let result;
+            try {
+                result = JSON.parse(text);
+            } catch (e) {
+                throw new Error(`Respuesta inválida del servidor (Posible error 500): ${text.substring(0, 100)}...`);
+            }
 
             if (res.ok) {
-                // ÉXITO
                 await leadsService.update(lead.id, { 
                     shopify_status: 'synced',
                     shopify_id: result.customer?.id || 'ok',
@@ -128,7 +136,6 @@ async function runBatchSync(leads, silent = false) {
                 });
                 successCount++;
             } else {
-                // ERROR DE LÓGICA (Shopify rechazó)
                 console.error('Shopify Reject:', result);
                 await leadsService.update(lead.id, { 
                     shopify_status: 'error', 
@@ -137,8 +144,7 @@ async function runBatchSync(leads, silent = false) {
                 errorCount++;
             }
         } catch (error) {
-            // ERROR DE RED
-            console.error(`Network Error ${lead.email}:`, error);
+            console.error(`Network/System Error ${lead.email}:`, error);
             await leadsService.update(lead.id, { 
                 shopify_status: 'error_network', 
                 shopify_error: error.message 
@@ -149,8 +155,8 @@ async function runBatchSync(leads, silent = false) {
 
     if (!silent) {
         Swal.fire({
-            title: 'Sincronización Finalizada',
-            html: `✅ Enviados: <b>${successCount}</b><br>❌ Fallidos: <b style="color:red">${errorCount}</b>`,
+            title: 'Proceso Finalizado',
+            html: `✅ Enviados: <b>${successCount}</b><br>❌ Fallidos: <b style="color:red">${errorCount}</b><br><span style="font-size:12px">Revisa los iconos rojos en la tabla para ver el error.</span>`,
             icon: errorCount > 0 ? 'warning' : 'success'
         });
     }
@@ -160,12 +166,10 @@ async function runBatchSync(leads, silent = false) {
 function renderApp() {
     const filteredLeads = filterLeads();
     
-    // Actualizar UI Global
-    updateKPIs(state.leads); // KPIs usan data global
+    updateKPIs(state.leads);
     updateChart(state.leads);
     toggleTrashBanner();
 
-    // Router de Vistas
     if (state.view === 'table') {
         document.getElementById('view-table').classList.remove('hidden');
         document.getElementById('view-kanban').classList.add('hidden');
@@ -183,30 +187,24 @@ function renderApp() {
 // === LÓGICA DE FILTRADO ===
 function filterLeads() {
     return state.leads.filter(lead => {
-        // 1. Filtro Papelera (Core Logic)
         const isTrashed = lead.status === 'trashed';
         
         if (state.trashMode) {
-            // Si estamos en modo papelera, SOLO mostrar basura
             if (!isTrashed) return false;
         } else {
-            // Si estamos en modo normal, mostrar TODO MENOS basura
             if (isTrashed) return false;
         }
 
-        // 2. Búsqueda de Texto
         const searchText = state.filters.search.toLowerCase();
         const leadName = (lead.nombre || '').toLowerCase();
         const leadEmail = (lead.email || '').toLowerCase();
         const matchText = leadName.includes(searchText) || leadEmail.includes(searchText);
         
-        // 3. Filtro Curso
         let leadInterestsStr = "";
         if(Array.isArray(lead.intereses)) leadInterestsStr = lead.intereses.join(' ').toLowerCase();
         else leadInterestsStr = (lead.curso_interes || '').toLowerCase();
         const matchCourse = state.filters.course === 'all' || leadInterestsStr.includes(state.filters.course.toLowerCase());
 
-        // 4. Filtro Fecha
         let matchDate = true;
         if (lead.fecha && state.filters.date !== 'all') {
             try {
@@ -235,7 +233,6 @@ function renderTable(leads) {
         return;
     }
 
-    // Ordenar: Más recientes primero
     leads.sort((a,b) => (b.fecha?.seconds || 0) - (a.fecha?.seconds || 0));
 
     leads.forEach(lead => {
@@ -247,17 +244,22 @@ function renderTable(leads) {
             const hasTemplate = !!matchingTemplate;
             const isSent = lead.emailSent || false;
             
-            // Icono Shopify
+            // Icono Shopify con Tooltip de Error
             let shopifyIcon = '';
-            if (lead.shopify_status === 'synced') shopifyIcon = '<i class="fa-brands fa-shopify text-green-500 text-lg" title="Sincronizado OK"></i>';
-            else if (lead.shopify_status === 'error') shopifyIcon = '<i class="fa-solid fa-circle-xmark text-red-500 text-lg cursor-help" title="Error de Datos (Ver Consola)"></i>';
-            else if (lead.shopify_status === 'error_network') shopifyIcon = '<i class="fa-solid fa-wifi text-orange-500 text-lg cursor-help" title="Error de Red"></i>';
-            else shopifyIcon = '<i class="fa-solid fa-clock text-gray-300" title="Pendiente"></i>';
+            let errorMsg = lead.shopify_error ? lead.shopify_error.replace(/"/g, "'") : "Error desconocido";
+            
+            if (lead.shopify_status === 'synced') {
+                shopifyIcon = '<i class="fa-brands fa-shopify text-green-500 text-lg" title="Sincronizado OK"></i>';
+            } else if (lead.shopify_status === 'error') {
+                shopifyIcon = `<i class="fa-solid fa-circle-xmark text-red-500 text-lg cursor-help" title="Rechazado por Shopify: ${errorMsg}"></i>`;
+            } else if (lead.shopify_status === 'error_network') {
+                shopifyIcon = `<i class="fa-solid fa-wifi text-orange-500 text-lg cursor-help" title="Error de Red/Servidor: ${errorMsg}"></i>`;
+            } else {
+                shopifyIcon = '<i class="fa-solid fa-clock text-gray-300" title="Pendiente de Sincronización"></i>';
+            }
 
-            // Botón Email
             let btnClass = isSent ? "bg-blue-100 text-blue-600 border border-blue-300" : "bg-gray-100 text-gray-500 hover:bg-gray-200 hover:text-gray-700";
             
-            // Intereses Display
             let interesesDisplay = lead.curso_interes || 'General';
             if(Array.isArray(lead.intereses) && lead.intereses.length > 0) interesesDisplay = lead.intereses[0];
 
@@ -273,7 +275,7 @@ function renderTable(leads) {
                     </div>
                 </td>
                 <td class="p-4">
-                    <span class="px-2 py-1 rounded text-xs font-semibold bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 truncate max-w-[120px] block">
+                    <span class="px-2 py-1 rounded text-xs font-semibold bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 truncate max-w-[100px] block">
                         ${interesesDisplay}
                     </span>
                 </td>
@@ -318,13 +320,11 @@ function renderKanban(leads) {
     if(!cols.pendiente) return; 
     Object.values(cols).forEach(c => c.innerHTML = '');
 
-    // Contadores
     document.getElementById('count-kanban-pending').innerText = leads.filter(l => (l.status||'pendiente') === 'pendiente').length;
     document.getElementById('count-kanban-progress').innerText = leads.filter(l => l.status === 'seguimiento').length;
     document.getElementById('count-kanban-contacted').innerText = leads.filter(l => l.status === 'contactado').length;
 
     leads.forEach(lead => {
-        // En kanban NO mostramos lo de la papelera nunca
         if(lead.status === 'trashed') return; 
 
         const st = lead.status || 'pendiente';
@@ -337,6 +337,7 @@ function renderKanban(leads) {
         let shopifyIcon = '';
         if(lead.shopify_status === 'synced') shopifyIcon = '<i class="fa-brands fa-shopify text-green-500 text-xs"></i>';
         else if(lead.shopify_status === 'error') shopifyIcon = '<i class="fa-solid fa-circle-exclamation text-red-500 text-xs"></i>';
+        else if(lead.shopify_status === 'error_network') shopifyIcon = '<i class="fa-solid fa-wifi text-orange-500 text-xs"></i>';
         
         card.innerHTML = `
             <div class="flex justify-between items-start mb-2">
@@ -504,7 +505,6 @@ async function saveCurrentTemplate() {
 
 // === AUXILIARES (KPI, Chart, UI) ===
 function updateKPIs(leads) {
-    // KPI cuenta todo lo activo
     const active = leads.filter(l => l.status !== 'trashed');
     if(document.getElementById('kpi-total')) document.getElementById('kpi-total').textContent = active.length;
     if(document.getElementById('kpi-pending')) document.getElementById('kpi-pending').textContent = active.filter(l => (l.status||'pendiente') === 'pendiente').length;
@@ -663,7 +663,7 @@ function injectManualSyncButton() {
         btn.innerHTML = "<i class='fa-solid fa-rotate'></i> Sincronizar Todo (Forzar)";
         
         btn.onclick = () => {
-            // Forzar sync manual de todo lo que falte
+            // Forzar sync manual de todo lo que falte (ignore status)
             const allPending = state.leads.filter(l => l.shopify_status !== 'synced');
             runBatchSync(allPending, false); 
         };
