@@ -1,10 +1,11 @@
 // ==========================================
-// CONTROLADOR PRINCIPAL (MASTER V7 - SYNC REFORZADO)
+// CONTROLADOR PRINCIPAL (MASTER V8 - SYNC BLINDADO)
 // ==========================================
 
 import { authService, leadsService, templatesService } from "./firebase-db.js";
 
 // --- CONFIGURACIÓN ---
+// Verifica que esta URL sea exactamente la de tu proyecto desplegado en Vercel
 const SHOPIFY_API_URL = "https://crm-programbi.vercel.app/api/create-customer"; 
 
 // === ESTADO DE LA APLICACIÓN ===
@@ -13,11 +14,7 @@ const state = {
     leads: [],
     templates: [], 
     view: 'table', 
-    filters: {
-        search: '',
-        date: 'all',
-        course: 'all'
-    },
+    filters: { search: '', date: 'all', course: 'all' },
     trashMode: false,
     chartInstance: null,
     activeTemplateId: null 
@@ -25,6 +22,7 @@ const state = {
 
 // === INICIALIZACIÓN ===
 document.addEventListener('DOMContentLoaded', () => {
+    console.log("🚀 CRM V8 Iniciado");
     initAuthListener();
     initEventListeners();
     setTimeout(injectManualSyncButton, 1500);
@@ -37,7 +35,6 @@ function initAuthListener() {
             document.getElementById('login-view').classList.add('hidden');
             document.getElementById('dashboard-view').classList.remove('hidden');
             document.getElementById('user-display').textContent = user.email || 'Admin';
-            
             subscribeToData();
         } else {
             document.getElementById('dashboard-view').classList.add('hidden');
@@ -51,9 +48,7 @@ function subscribeToData() {
     leadsService.subscribe((data) => {
         state.leads = data;
         renderApp();
-        
-        // AUTO-SYNC MEJORADO: Atrapa 'pending' Y también los que no tienen estado (null/undefined)
-        // Esto soluciona el problema de que los leads viejos se ignoren.
+        // Intentar sincronizar SOLO los nuevos pendientes (para no saturar)
         syncNewLeadsOnly(data); 
     });
 
@@ -67,15 +62,16 @@ function subscribeToData() {
 // === MOTOR DE SINCRONIZACIÓN (SHOPIFY) ===
 
 async function syncNewLeadsOnly(leads) {
-    // Filtro más permisivo: Sincroniza si es 'pending' O si no tiene estado definido.
+    // Filtramos solo los que están explícitamente pendientes o sin estado
+    // Ignoramos los que ya dieron error para evitar bucles infinitos automáticos
     const leadsToSync = leads.filter(l => 
         l.status !== 'trashed' && 
         (l.shopify_status === 'pending' || !l.shopify_status)
     );
 
     if (leadsToSync.length > 0) {
-        console.log(`⚡ Auto-Sync: Procesando ${leadsToSync.length} leads...`);
-        runBatchSync(leadsToSync, true); // Silencioso
+        console.log(`⚡ Auto-Sync: Procesando ${leadsToSync.length} nuevos leads...`);
+        runBatchSync(leadsToSync, true); // true = modo silencioso
     }
 }
 
@@ -87,8 +83,8 @@ async function runBatchSync(leads, silent = false) {
 
     if (!silent) {
         Swal.fire({
-            title: 'Conectando con Shopify...',
-            html: `Enviando <b>${leads.length}</b> contactos.<br>Por favor espera...`,
+            title: 'Sincronizando...',
+            html: `Enviando <b>${leads.length}</b> contactos a Shopify.<br>No cierres la ventana.`,
             didOpen: () => Swal.showLoading()
         });
     }
@@ -98,53 +94,73 @@ async function runBatchSync(leads, silent = false) {
 
     for (const lead of leads) {
         try {
-            // Data Cleaning Robusto
+            // --- PASO 1: LIMPIEZA DE DATOS (CRÍTICO) ---
             const intereses = Array.isArray(lead.intereses) ? lead.intereses : [lead.curso_interes || 'General'];
-            // Limpiamos tags agresivamente para evitar rechazos de Shopify
-            const tags = intereses.map(i => 
-                `curso-${String(i).toLowerCase().trim().replace(/[^a-z0-9]+/g, '-')}`
-            ).join(', ');
+            
+            // Función para limpiar acentos y caracteres especiales de los tags
+            const cleanTag = (str) => {
+                return String(str)
+                    .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // Quitar acentos
+                    .toLowerCase()
+                    .trim()
+                    .replace(/[^a-z0-9]+/g, '-'); // Reemplazar no alfanuméricos con guion
+            };
+
+            const tagsArray = intereses.map(i => `curso-${cleanTag(i)}`);
+            tagsArray.push('lead-web', 'crm-sync'); // Tags base
+            const tagsFinal = tagsArray.join(', ');
             
             const payload = {
                 nombre: lead.nombre || 'Desconocido',
                 email: lead.email,
                 telefono: lead.telefono || '',
-                tags: `lead-web, crm-sync, ${tags}`,
+                tags: tagsFinal,
                 nota: `Empresa: ${lead.empresa || 'N/A'}\nMensaje: ${lead.mensaje || ''}\nOrigen: ${lead.origen || 'Web'}`
             };
 
+            // --- PASO 2: ENVÍO A VERCEL ---
+            console.log(`📤 Enviando ${lead.email}...`);
+            
             const res = await fetch(SHOPIFY_API_URL, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
             });
 
-            // Manejo de respuesta seguro (evita crash si Vercel devuelve HTML de error)
+            // --- PASO 3: MANEJO DE RESPUESTA ---
             const text = await res.text();
             let result;
             try {
                 result = JSON.parse(text);
             } catch (e) {
-                throw new Error(`Respuesta inválida del servidor (Posible error 500): ${text.substring(0, 100)}...`);
+                // Si falla el parseo, es un error de servidor (HTML o texto plano)
+                throw new Error(`Error del Servidor (${res.status}): ${text.substring(0, 100)}`);
             }
 
             if (res.ok) {
+                // ÉXITO
                 await leadsService.update(lead.id, { 
                     shopify_status: 'synced',
                     shopify_id: result.customer?.id || 'ok',
-                    shopify_synced_at: new Date()
+                    shopify_synced_at: new Date(),
+                    shopify_error: null // Limpiar errores previos
                 });
                 successCount++;
             } else {
+                // ERROR DE LÓGICA (Shopify rechazó)
                 console.error('Shopify Reject:', result);
+                let errorMsg = JSON.stringify(result);
+                if(result.details) errorMsg = JSON.stringify(result.details);
+                
                 await leadsService.update(lead.id, { 
                     shopify_status: 'error', 
-                    shopify_error: JSON.stringify(result) 
+                    shopify_error: errorMsg
                 });
                 errorCount++;
             }
         } catch (error) {
-            console.error(`Network/System Error ${lead.email}:`, error);
+            // ERROR DE RED O SISTEMA
+            console.error(`Network Error ${lead.email}:`, error);
             await leadsService.update(lead.id, { 
                 shopify_status: 'error_network', 
                 shopify_error: error.message 
@@ -155,8 +171,8 @@ async function runBatchSync(leads, silent = false) {
 
     if (!silent) {
         Swal.fire({
-            title: 'Proceso Finalizado',
-            html: `✅ Enviados: <b>${successCount}</b><br>❌ Fallidos: <b style="color:red">${errorCount}</b><br><span style="font-size:12px">Revisa los iconos rojos en la tabla para ver el error.</span>`,
+            title: 'Sincronización Finalizada',
+            html: `✅ Enviados: <b>${successCount}</b><br>❌ Fallidos: <b style="color:red">${errorCount}</b><br><small>Revisa los iconos rojos en la tabla para ver el error.</small>`,
             icon: errorCount > 0 ? 'warning' : 'success'
         });
     }
@@ -189,6 +205,7 @@ function filterLeads() {
     return state.leads.filter(lead => {
         const isTrashed = lead.status === 'trashed';
         
+        // Si trashMode es true, SOLO muestra basura. Si es false, muestra TODO MENOS basura.
         if (state.trashMode) {
             if (!isTrashed) return false;
         } else {
@@ -198,26 +215,8 @@ function filterLeads() {
         const searchText = state.filters.search.toLowerCase();
         const leadName = (lead.nombre || '').toLowerCase();
         const leadEmail = (lead.email || '').toLowerCase();
-        const matchText = leadName.includes(searchText) || leadEmail.includes(searchText);
         
-        let leadInterestsStr = "";
-        if(Array.isArray(lead.intereses)) leadInterestsStr = lead.intereses.join(' ').toLowerCase();
-        else leadInterestsStr = (lead.curso_interes || '').toLowerCase();
-        const matchCourse = state.filters.course === 'all' || leadInterestsStr.includes(state.filters.course.toLowerCase());
-
-        let matchDate = true;
-        if (lead.fecha && state.filters.date !== 'all') {
-            try {
-                const d = lead.fecha.toDate();
-                const now = new Date();
-                const diffDays = Math.ceil(Math.abs(now - d) / (1000 * 60 * 60 * 24)); 
-                if (state.filters.date === 'today') matchDate = diffDays <= 1;
-                if (state.filters.date === 'week') matchDate = diffDays <= 7;
-                if (state.filters.date === 'month') matchDate = diffDays <= 30;
-            } catch(e) { matchDate = true; } 
-        }
-
-        return matchText && matchCourse && matchDate;
+        return leadName.includes(searchText) || leadEmail.includes(searchText);
     });
 }
 
@@ -233,6 +232,7 @@ function renderTable(leads) {
         return;
     }
 
+    // Ordenar: Más recientes primero
     leads.sort((a,b) => (b.fecha?.seconds || 0) - (a.fecha?.seconds || 0));
 
     leads.forEach(lead => {
@@ -240,20 +240,18 @@ function renderTable(leads) {
             const tr = document.createElement('tr');
             tr.className = `hover:bg-gray-50 dark:hover:bg-gray-800/50 border-b border-gray-100 dark:border-gray-700 transition fade-in ${isCorporate(lead.email) ? 'bg-blue-50/30 dark:bg-blue-900/10' : ''}`;
             
-            const matchingTemplate = findBestTemplate(lead);
-            const hasTemplate = !!matchingTemplate;
             const isSent = lead.emailSent || false;
             
-            // Icono Shopify con Tooltip de Error
+            // --- DIAGNÓSTICO VISUAL SHOPIFY ---
             let shopifyIcon = '';
-            let errorMsg = lead.shopify_error ? lead.shopify_error.replace(/"/g, "'") : "Error desconocido";
+            let errorTitle = lead.shopify_error ? String(lead.shopify_error).replace(/"/g, "'") : "Error desconocido";
             
             if (lead.shopify_status === 'synced') {
                 shopifyIcon = '<i class="fa-brands fa-shopify text-green-500 text-lg" title="Sincronizado OK"></i>';
             } else if (lead.shopify_status === 'error') {
-                shopifyIcon = `<i class="fa-solid fa-circle-xmark text-red-500 text-lg cursor-help" title="Rechazado por Shopify: ${errorMsg}"></i>`;
+                shopifyIcon = `<i class="fa-solid fa-circle-xmark text-red-500 text-lg cursor-help" title="Rechazado por Shopify: ${errorTitle}"></i>`;
             } else if (lead.shopify_status === 'error_network') {
-                shopifyIcon = `<i class="fa-solid fa-wifi text-orange-500 text-lg cursor-help" title="Error de Red/Servidor: ${errorMsg}"></i>`;
+                shopifyIcon = `<i class="fa-solid fa-wifi text-orange-500 text-lg cursor-help" title="Error de Red/API: ${errorTitle}"></i>`;
             } else {
                 shopifyIcon = '<i class="fa-solid fa-clock text-gray-300" title="Pendiente de Sincronización"></i>';
             }
@@ -271,7 +269,7 @@ function renderTable(leads) {
                             <div class="font-bold text-gray-800 dark:text-gray-200 text-sm">${lead.nombre || 'Sin nombre'}</div>
                             <div class="text-xs text-gray-500">${lead.email || 'Sin email'}</div>
                         </div>
-                        ${shopifyIcon}
+                        ${shopifyIcon} <!-- ICONO DE ESTADO -->
                     </div>
                 </td>
                 <td class="p-4">
@@ -294,10 +292,8 @@ function renderTable(leads) {
                     ` : `
                         <button class="action-email w-8 h-8 rounded-full ${btnClass} transition flex items-center justify-center relative group" data-id="${lead.id}">
                             <i class="fa-solid fa-envelope"></i>
-                            ${hasTemplate && !isSent ? '<span class="absolute top-0 right-0 w-2 h-2 bg-blue-500 rounded-full border border-white"></span>' : ''}
                         </button>
                         <button class="action-wa w-8 h-8 rounded-full bg-green-50 text-green-600 hover:bg-green-500 hover:text-white transition flex items-center justify-center" data-phone="${lead.telefono}" data-name="${lead.nombre}"><i class="fab fa-whatsapp"></i></button>
-                        <button class="action-note w-8 h-8 rounded-full bg-yellow-50 text-yellow-600 hover:bg-yellow-400 hover:text-white transition flex items-center justify-center" data-id="${lead.id}" data-note="${lead.observaciones||''}"><i class="fa-solid fa-pen"></i></button>
                         <button class="action-trash w-8 h-8 rounded-full text-gray-400 hover:text-red-500 hover:bg-red-50 transition flex items-center justify-center" data-id="${lead.id}" title="Mover a Papelera"><i class="fa-solid fa-trash"></i></button>
                     `}
                 </td>
@@ -663,7 +659,7 @@ function injectManualSyncButton() {
         btn.innerHTML = "<i class='fa-solid fa-rotate'></i> Sincronizar Todo (Forzar)";
         
         btn.onclick = () => {
-            // Forzar sync manual de todo lo que falte (ignore status)
+            // Forzar sync manual de todo lo que NO esté synced, incluso errores previos
             const allPending = state.leads.filter(l => l.shopify_status !== 'synced');
             runBatchSync(allPending, false); 
         };
@@ -674,14 +670,17 @@ function injectManualSyncButton() {
 
 // === LISTENERS GENERALES ===
 function initEventListeners() {
-    document.getElementById('login-form').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const res = await authService.login(
-            document.getElementById('login-email').value,
-            document.getElementById('login-password').value
-        );
-        if (!res.success) Swal.fire('Error', 'Credenciales incorrectas', 'error');
-    });
+    const loginForm = document.getElementById('login-form');
+    if(loginForm) {
+        loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const res = await authService.login(
+                document.getElementById('login-email').value,
+                document.getElementById('login-password').value
+            );
+            if (!res.success) Swal.fire('Error', 'Credenciales incorrectas', 'error');
+        });
+    }
     document.getElementById('logout-btn').onclick = () => authService.logout();
 
     // Filtros
