@@ -1,31 +1,29 @@
 // ==========================================
-// CONTROLADOR PRINCIPAL (MASTER V8 - SYNC BLINDADO)
+// CONTROLADOR PRINCIPAL (MAIN APP LOGIC)
 // ==========================================
 
 import { authService, leadsService, templatesService } from "./firebase-db.js";
-
-// --- CONFIGURACIÓN ---
-// Verifica que esta URL sea exactamente la de tu proyecto desplegado en Vercel
-const SHOPIFY_API_URL = "https://crm-programbi.vercel.app/api/create-customer"; 
 
 // === ESTADO DE LA APLICACIÓN ===
 const state = {
     user: null,
     leads: [],
-    templates: [], 
-    view: 'table', 
-    filters: { search: '', date: 'all', course: 'all' },
+    templates: [],
+    view: 'table',
+    filters: {
+        search: '',
+        date: 'all',
+        course: 'all'
+    },
     trashMode: false,
     chartInstance: null,
-    activeTemplateId: null 
+    activeTemplateId: null
 };
 
 // === INICIALIZACIÓN ===
 document.addEventListener('DOMContentLoaded', () => {
-    console.log("🚀 CRM V8 Iniciado");
     initAuthListener();
     initEventListeners();
-    setTimeout(injectManualSyncButton, 1500);
 });
 
 function initAuthListener() {
@@ -35,6 +33,7 @@ function initAuthListener() {
             document.getElementById('login-view').classList.add('hidden');
             document.getElementById('dashboard-view').classList.remove('hidden');
             document.getElementById('user-display').textContent = user.email || 'Admin';
+
             subscribeToData();
         } else {
             document.getElementById('dashboard-view').classList.add('hidden');
@@ -44,148 +43,31 @@ function initAuthListener() {
 }
 
 function subscribeToData() {
-    // 1. LEADS
     leadsService.subscribe((data) => {
         state.leads = data;
         renderApp();
-        // Intentar sincronizar SOLO los nuevos pendientes (para no saturar)
-        syncNewLeadsOnly(data); 
     });
 
-    // 2. PLANTILLAS
     templatesService.subscribe((data) => {
         state.templates = data;
-        renderTemplatesList(); 
+        renderTemplatesList();
+        renderApp();
     });
-}
-
-// === MOTOR DE SINCRONIZACIÓN (SHOPIFY) ===
-
-async function syncNewLeadsOnly(leads) {
-    // Filtramos solo los que están explícitamente pendientes o sin estado
-    // Ignoramos los que ya dieron error para evitar bucles infinitos automáticos
-    const leadsToSync = leads.filter(l => 
-        l.status !== 'trashed' && 
-        (l.shopify_status === 'pending' || !l.shopify_status)
-    );
-
-    if (leadsToSync.length > 0) {
-        console.log(`⚡ Auto-Sync: Procesando ${leadsToSync.length} nuevos leads...`);
-        runBatchSync(leadsToSync, true); // true = modo silencioso
-    }
-}
-
-async function runBatchSync(leads, silent = false) {
-    if (leads.length === 0) {
-        if(!silent) Swal.fire('Estado', 'No hay leads pendientes de sincronizar.', 'info');
-        return;
-    }
-
-    if (!silent) {
-        Swal.fire({
-            title: 'Sincronizando...',
-            html: `Enviando <b>${leads.length}</b> contactos a Shopify.<br>No cierres la ventana.`,
-            didOpen: () => Swal.showLoading()
-        });
-    }
-
-    let successCount = 0;
-    let errorCount = 0;
-
-    for (const lead of leads) {
-        try {
-            // --- PASO 1: LIMPIEZA DE DATOS (CRÍTICO) ---
-            const intereses = Array.isArray(lead.intereses) ? lead.intereses : [lead.curso_interes || 'General'];
-            
-            // Función para limpiar acentos y caracteres especiales de los tags
-            const cleanTag = (str) => {
-                return String(str)
-                    .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // Quitar acentos
-                    .toLowerCase()
-                    .trim()
-                    .replace(/[^a-z0-9]+/g, '-'); // Reemplazar no alfanuméricos con guion
-            };
-
-            const tagsArray = intereses.map(i => `curso-${cleanTag(i)}`);
-            tagsArray.push('lead-web', 'crm-sync'); // Tags base
-            const tagsFinal = tagsArray.join(', ');
-            
-            const payload = {
-                nombre: lead.nombre || 'Desconocido',
-                email: lead.email,
-                telefono: lead.telefono || '',
-                tags: tagsFinal,
-                nota: `Empresa: ${lead.empresa || 'N/A'}\nMensaje: ${lead.mensaje || ''}\nOrigen: ${lead.origen || 'Web'}`
-            };
-
-            // --- PASO 2: ENVÍO A VERCEL ---
-            console.log(`📤 Enviando ${lead.email}...`);
-            
-            const res = await fetch(SHOPIFY_API_URL, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
-
-            // --- PASO 3: MANEJO DE RESPUESTA ---
-            const text = await res.text();
-            let result;
-            try {
-                result = JSON.parse(text);
-            } catch (e) {
-                // Si falla el parseo, es un error de servidor (HTML o texto plano)
-                throw new Error(`Error del Servidor (${res.status}): ${text.substring(0, 100)}`);
-            }
-
-            if (res.ok) {
-                // ÉXITO
-                await leadsService.update(lead.id, { 
-                    shopify_status: 'synced',
-                    shopify_id: result.customer?.id || 'ok',
-                    shopify_synced_at: new Date(),
-                    shopify_error: null // Limpiar errores previos
-                });
-                successCount++;
-            } else {
-                // ERROR DE LÓGICA (Shopify rechazó)
-                console.error('Shopify Reject:', result);
-                let errorMsg = JSON.stringify(result);
-                if(result.details) errorMsg = JSON.stringify(result.details);
-                
-                await leadsService.update(lead.id, { 
-                    shopify_status: 'error', 
-                    shopify_error: errorMsg
-                });
-                errorCount++;
-            }
-        } catch (error) {
-            // ERROR DE RED O SISTEMA
-            console.error(`Network Error ${lead.email}:`, error);
-            await leadsService.update(lead.id, { 
-                shopify_status: 'error_network', 
-                shopify_error: error.message 
-            });
-            errorCount++;
-        }
-    }
-
-    if (!silent) {
-        Swal.fire({
-            title: 'Sincronización Finalizada',
-            html: `✅ Enviados: <b>${successCount}</b><br>❌ Fallidos: <b style="color:red">${errorCount}</b><br><small>Revisa los iconos rojos en la tabla para ver el error.</small>`,
-            icon: errorCount > 0 ? 'warning' : 'success'
-        });
-    }
 }
 
 // === RENDERIZADO PRINCIPAL ===
 function renderApp() {
+    // 1. Filtrar los leads según el estado (Activos o Papelera)
     const filteredLeads = filterLeads();
-    
+
+    // 2. Actualizar KPIs y Gráficos (Siempre con datos globales activos)
     updateKPIs(state.leads);
     updateChart(state.leads);
+
+    // 3. Aviso Visual de Papelera
     toggleTrashBanner();
 
+    // 4. Renderizar Vistas
     if (state.view === 'table') {
         document.getElementById('view-table').classList.remove('hidden');
         document.getElementById('view-kanban').classList.add('hidden');
@@ -197,30 +79,149 @@ function renderApp() {
     }
 
     updateViewButtons();
-    updateTrashButtonState();
+
+    // 5. Estado del Botón Papelera
+    const trashBtn = document.getElementById('btn-trash');
+    if (state.trashMode) {
+        trashBtn.classList.add('text-red-600', 'bg-red-100', 'ring-2', 'ring-red-400');
+        trashBtn.innerHTML = '<i class="fa-solid fa-folder-open"></i>'; // Icono cambiar a "ver activos"
+        trashBtn.title = "Salir de Papelera (Ver Activos)";
+    } else {
+        trashBtn.classList.remove('text-red-600', 'bg-red-100', 'ring-2', 'ring-red-400');
+        trashBtn.innerHTML = '<i class="fa-solid fa-trash-can"></i>';
+        trashBtn.title = "Ver Papelera";
+    }
 }
 
-// === LÓGICA DE FILTRADO ===
+// === NUEVO: BANNER DE PAPELERA ===
+function toggleTrashBanner() {
+    let banner = document.getElementById('trash-banner');
+    if (!banner) {
+        // Crear banner si no existe
+        banner = document.createElement('div');
+        banner.id = 'trash-banner';
+        banner.className = 'hidden bg-red-50 border-b border-red-100 text-red-600 text-center py-2 text-sm font-bold flex items-center justify-center gap-2 mb-4 rounded-xl';
+        banner.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> ESTÁS VIENDO LA PAPELERA DE RECICLAJE (Archivos Eliminados)';
+        // Insertar antes de la tabla/kanban container
+        const container = document.querySelector('main > div.relative');
+        if (container) container.parentNode.insertBefore(banner, container);
+    }
+
+    if (state.trashMode) banner.classList.remove('hidden');
+    else banner.classList.add('hidden');
+}
+
+// === LÓGICA DE FILTROS ===
 function filterLeads() {
     return state.leads.filter(lead => {
-        const isTrashed = lead.status === 'trashed';
-        
-        // Si trashMode es true, SOLO muestra basura. Si es false, muestra TODO MENOS basura.
+        // Lógica estricta de Papelera vs Activos
         if (state.trashMode) {
-            if (!isTrashed) return false;
+            // Si estoy en modo papelera, SOLO mostrar 'trashed'
+            if (lead.status !== 'trashed') return false;
         } else {
-            if (isTrashed) return false;
+            // Si estoy en modo normal, OCULTAR 'trashed'
+            if (lead.status === 'trashed') return false;
         }
 
+        // Filtros de Texto y Fecha
         const searchText = state.filters.search.toLowerCase();
         const leadName = (lead.nombre || '').toLowerCase();
         const leadEmail = (lead.email || '').toLowerCase();
-        
-        return leadName.includes(searchText) || leadEmail.includes(searchText);
+
+        const matchText = leadName.includes(searchText) || leadEmail.includes(searchText);
+
+        const matchCourse = state.filters.course === 'all' || (lead.curso_interes || '').includes(state.filters.course);
+
+        let matchDate = true;
+        if (lead.fecha && state.filters.date !== 'all') {
+            const d = lead.fecha.toDate();
+            const now = new Date();
+            const diffTime = Math.abs(now - d);
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+            if (state.filters.date === 'today') matchDate = diffDays <= 1;
+            if (state.filters.date === 'week') matchDate = diffDays <= 7;
+            if (state.filters.date === 'month') matchDate = diffDays <= 30;
+        }
+
+        return matchText && matchCourse && matchDate;
     });
 }
 
-// === RENDERIZADO TABLA ===
+// === EXPORTAR A EXCEL ===
+function exportToExcel() {
+    try {
+        const leadsToExport = filterLeads();
+
+        if (leadsToExport.length === 0) {
+            Swal.fire('Atención', 'No hay datos para exportar con los filtros actuales', 'warning');
+            return;
+        }
+
+        const data = leadsToExport.map(lead => {
+            let fechaStr = '';
+            if (lead.fecha) {
+                const d = lead.fecha.toDate();
+                fechaStr = d.toLocaleDateString('es-ES') + ' ' + d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+            }
+
+            return {
+                "Fecha": fechaStr,
+                "Nombre": lead.nombre || '',
+                "Email": lead.email || '',
+                "Teléfono": lead.telefono || '',
+                "Curso Interés": lead.curso_interes || '',
+                "Mensaje": lead.mensaje || '',
+                "Estado": (lead.status || 'pendiente').toUpperCase(),
+                "Observaciones": lead.observaciones || ''
+            };
+        });
+
+        const ws = XLSX.utils.json_to_sheet(data);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Leads");
+
+        const dateStr = new Date().toISOString().split('T')[0];
+        XLSX.writeFile(wb, `Leads_CRM_${dateStr}.xlsx`);
+
+        Swal.fire({
+            toast: true,
+            icon: 'success',
+            title: 'Exportación exitosa',
+            position: 'top-end',
+            showConfirmButton: false,
+            timer: 2000
+        });
+
+    } catch (error) {
+        console.error("Error exportando:", error);
+        Swal.fire('Error', 'Hubo un problema al exportar. Revisa la consola.', 'error');
+    }
+}
+
+// === HELPER: BUSCADOR DE PLANTILLAS (BLINDADO) ===
+function findBestTemplate(leadInterest) {
+    if (!leadInterest) return null;
+
+    // Protección contra datos corruptos
+    const cleanInterest = String(leadInterest).toLowerCase().trim();
+
+    let match = state.templates.find(t => {
+        // Protección extra por si una plantilla no tiene nombre
+        const tName = (t.courseName || '').toLowerCase();
+        if (tName === 'manual' || tName === 'todos los cursos') return false;
+
+        return (tName.includes(cleanInterest) || cleanInterest.includes(tName));
+    });
+
+    if (!match) {
+        match = state.templates.find(t => t.courseName === 'Todos los Cursos');
+    }
+
+    return match;
+}
+
+// === RENDERIZADO: TABLA (CORREGIDO) ===
 function renderTable(leads) {
     const tbody = document.getElementById('table-body');
     tbody.innerHTML = '';
@@ -232,49 +233,39 @@ function renderTable(leads) {
         return;
     }
 
-    // Ordenar: Más recientes primero
-    leads.sort((a,b) => (b.fecha?.seconds || 0) - (a.fecha?.seconds || 0));
-
     leads.forEach(lead => {
+        // Bloque try-catch para que un error en una fila no rompa toda la tabla
         try {
             const tr = document.createElement('tr');
             tr.className = `hover:bg-gray-50 dark:hover:bg-gray-800/50 border-b border-gray-100 dark:border-gray-700 transition fade-in ${isCorporate(lead.email) ? 'bg-blue-50/30 dark:bg-blue-900/10' : ''}`;
-            
+
+            // Lógica de Plantilla con protecciones
+            const matchingTemplate = findBestTemplate(lead.curso_interes);
+            const hasTemplate = !!matchingTemplate;
+            const tName = matchingTemplate ? matchingTemplate.courseName : '';
+
+            // ESTILO DE BOTÓN: AZUL SI YA SE ENVIÓ, GRIS SI NO
             const isSent = lead.emailSent || false;
-            
-            // --- DIAGNÓSTICO VISUAL SHOPIFY ---
-            let shopifyIcon = '';
-            let errorTitle = lead.shopify_error ? String(lead.shopify_error).replace(/"/g, "'") : "Error desconocido";
-            
-            if (lead.shopify_status === 'synced') {
-                shopifyIcon = '<i class="fa-brands fa-shopify text-green-500 text-lg" title="Sincronizado OK"></i>';
-            } else if (lead.shopify_status === 'error') {
-                shopifyIcon = `<i class="fa-solid fa-circle-xmark text-red-500 text-lg cursor-help" title="Rechazado por Shopify: ${errorTitle}"></i>`;
-            } else if (lead.shopify_status === 'error_network') {
-                shopifyIcon = `<i class="fa-solid fa-wifi text-orange-500 text-lg cursor-help" title="Error de Red/API: ${errorTitle}"></i>`;
-            } else {
-                shopifyIcon = '<i class="fa-solid fa-clock text-gray-300" title="Pendiente de Sincronización"></i>';
+            let btnClass = "bg-gray-100 text-gray-500 hover:bg-gray-200 hover:text-gray-700 dark:bg-gray-700 dark:text-gray-400";
+            if (isSent) {
+                btnClass = "bg-blue-100 text-blue-600 hover:bg-blue-200 hover:text-blue-700 border border-blue-300 shadow-sm";
             }
 
-            let btnClass = isSent ? "bg-blue-100 text-blue-600 border border-blue-300" : "bg-gray-100 text-gray-500 hover:bg-gray-200 hover:text-gray-700";
-            
-            let interesesDisplay = lead.curso_interes || 'General';
-            if(Array.isArray(lead.intereses) && lead.intereses.length > 0) interesesDisplay = lead.intereses[0];
+            const titleText = hasTemplate ? `Previsualizar plantilla de: ${tName}` : "Enviar correo genérico";
 
             tr.innerHTML = `
-                <td class="p-4"><div class="flex items-center gap-1 text-yellow-400 text-xs">${'⭐'.repeat(calculateScore(lead))}</div></td>
                 <td class="p-4">
-                    <div class="flex items-center gap-2">
-                        <div>
-                            <div class="font-bold text-gray-800 dark:text-gray-200 text-sm">${lead.nombre || 'Sin nombre'}</div>
-                            <div class="text-xs text-gray-500">${lead.email || 'Sin email'}</div>
-                        </div>
-                        ${shopifyIcon} <!-- ICONO DE ESTADO -->
+                    <div class="flex items-center gap-1 text-yellow-400 text-xs">
+                        ${'⭐'.repeat(calculateScore(lead))}
                     </div>
                 </td>
                 <td class="p-4">
-                    <span class="px-2 py-1 rounded text-xs font-semibold bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 truncate max-w-[100px] block">
-                        ${interesesDisplay}
+                    <div class="font-bold text-gray-800 dark:text-gray-200">${lead.nombre || 'Sin nombre'}</div>
+                    <div class="text-xs text-gray-500">${lead.email || 'Sin email'}</div>
+                </td>
+                <td class="p-4">
+                    <span class="px-2 py-1 rounded text-xs font-semibold bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300">
+                        ${lead.curso_interes || 'General'}
                     </span>
                 </td>
                 <td class="p-4 text-center">
@@ -282,136 +273,190 @@ function renderTable(leads) {
                         ${(lead.status || 'pendiente').toUpperCase()}
                     </button>
                 </td>
+                <td class="p-4">
+                    <div class="flex flex-col gap-1 max-w-xs">
+                         ${lead.mensaje ? `
+                            <div class="bg-gray-50 dark:bg-gray-800 p-2 rounded-lg border border-gray-100 dark:border-gray-700 text-xs italic text-gray-600 dark:text-gray-300 relative">
+                                <i class="fa-solid fa-quote-left text-gray-300 absolute -top-1 -left-1 text-[10px]"></i>
+                                ${lead.mensaje}
+                            </div>
+                         ` : '<span class="text-xs text-gray-300 italic">Sin mensaje</span>'}
+                         <span class="text-[10px] text-gray-400 text-right">
+                            <i class="fa-regular fa-clock mr-1"></i>
+                            ${lead.fecha ? lead.fecha.toDate().toLocaleDateString('es-ES') + ' ' + lead.fecha.toDate().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }) : '--'}
+                         </span>
+                    </div>
+                </td>
                 <td class="p-4 text-center">
                     ${lead.observaciones ? `<i class="fa-solid fa-note-sticky text-yellow-500 cursor-help" title="${lead.observaciones}"></i>` : '<span class="text-gray-300">-</span>'}
                 </td>
                 <td class="p-4 flex justify-center gap-2">
                     ${state.trashMode ? `
                         <button class="action-restore text-green-500 hover:bg-green-100 p-2 rounded-full" data-id="${lead.id}" title="Restaurar"><i class="fa-solid fa-trash-arrow-up"></i></button>
-                        <button class="action-delete text-red-600 hover:bg-red-100 p-2 rounded-full" data-id="${lead.id}" title="Eliminar Definitivo"><i class="fa-solid fa-xmark"></i></button>
+                        <button class="action-delete text-red-600 hover:bg-red-100 p-2 rounded-full" data-id="${lead.id}" title="Eliminar para siempre"><i class="fa-solid fa-xmark"></i></button>
                     ` : `
-                        <button class="action-email w-8 h-8 rounded-full ${btnClass} transition flex items-center justify-center relative group" data-id="${lead.id}">
+                        <button class="action-email w-8 h-8 rounded-full ${btnClass} transition flex items-center justify-center relative group" 
+                                data-id="${lead.id}" title="${titleText}">
                             <i class="fa-solid fa-envelope"></i>
+                            ${hasTemplate && !isSent ? '<span class="absolute top-0 right-0 w-2 h-2 bg-blue-500 rounded-full border border-white"></span>' : ''}
                         </button>
+                        
                         <button class="action-wa w-8 h-8 rounded-full bg-green-50 text-green-600 hover:bg-green-500 hover:text-white transition flex items-center justify-center" data-phone="${lead.telefono}" data-name="${lead.nombre}"><i class="fab fa-whatsapp"></i></button>
-                        <button class="action-trash w-8 h-8 rounded-full text-gray-400 hover:text-red-500 hover:bg-red-50 transition flex items-center justify-center" data-id="${lead.id}" title="Mover a Papelera"><i class="fa-solid fa-trash"></i></button>
+                        <button class="action-note w-8 h-8 rounded-full bg-yellow-50 text-yellow-600 hover:bg-yellow-400 hover:text-white transition flex items-center justify-center" data-id="${lead.id}" data-note="${lead.observaciones || ''}"><i class="fa-solid fa-pen"></i></button>
+                        <button class="action-trash w-8 h-8 rounded-full text-gray-400 hover:text-red-500 hover:bg-red-50 transition flex items-center justify-center" data-id="${lead.id}"><i class="fa-solid fa-trash"></i></button>
                     `}
                 </td>
             `;
             tbody.appendChild(tr);
-        } catch (err) { console.error("Error fila:", err); }
+        } catch (err) {
+            console.error("Error renderizando fila:", err, lead);
+        }
     });
 
     attachDynamicListeners();
 }
 
-// === RENDERIZADO KANBAN ===
+// === RENDERIZADO: KANBAN (CORREGIDO) ===
 function renderKanban(leads) {
     const cols = {
         pendiente: document.getElementById('kanban-pending'),
         seguimiento: document.getElementById('kanban-progress'),
         contactado: document.getElementById('kanban-contacted')
     };
-    
-    if(!cols.pendiente) return; 
+
+    // Si cols.pendiente es null, significa que el DOM no está listo o id incorrecto
+    if (!cols.pendiente) return;
+
     Object.values(cols).forEach(c => c.innerHTML = '');
 
-    document.getElementById('count-kanban-pending').innerText = leads.filter(l => (l.status||'pendiente') === 'pendiente').length;
-    document.getElementById('count-kanban-progress').innerText = leads.filter(l => l.status === 'seguimiento').length;
-    document.getElementById('count-kanban-contacted').innerText = leads.filter(l => l.status === 'contactado').length;
-
+    // CAMBIO IMPORTANTE: Eliminamos el filtro 'trashed' aquí.
+    // Ahora renderiza todo lo que 'filterLeads' le pase, sea papelera o no.
     leads.forEach(lead => {
-        if(lead.status === 'trashed') return; 
+        const col = cols[lead.status] || cols['pendiente'];
+        // Si el estado es 'trashed' y estamos en Kanban, lo mandamos a 'pendiente' visualmente o lo manejamos
+        // Para simplificar, si el estado es 'trashed', no tiene columna oficial, pero filterLeads ya nos dio los datos.
+        // Lo pondremos en "Pendiente" visualmente si no tiene estado válido, o creamos lógica para mostrarlo.
 
-        const st = lead.status || 'pendiente';
-        const col = cols[st] || cols['pendiente'];
-        
         const card = document.createElement('div');
         card.className = `bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm border border-gray-100 dark:border-gray-600 cursor-grab hover:shadow-md transition fade-in mb-3 ${isCorporate(lead.email) ? 'border-l-4 border-l-blue-500' : ''}`;
         card.setAttribute('data-id', lead.id);
-        
-        let shopifyIcon = '';
-        if(lead.shopify_status === 'synced') shopifyIcon = '<i class="fa-brands fa-shopify text-green-500 text-xs"></i>';
-        else if(lead.shopify_status === 'error') shopifyIcon = '<i class="fa-solid fa-circle-exclamation text-red-500 text-xs"></i>';
-        else if(lead.shopify_status === 'error_network') shopifyIcon = '<i class="fa-solid fa-wifi text-orange-500 text-xs"></i>';
-        
+
+        // Agregar distintivo si es papelera
+        const trashBadge = lead.status === 'trashed' ? '<span class="text-xs bg-red-100 text-red-600 px-1 rounded font-bold">ELIMINADO</span>' : '';
+
         card.innerHTML = `
             <div class="flex justify-between items-start mb-2">
-                <h4 class="font-bold text-sm text-gray-800 dark:text-gray-100 truncate w-32">${lead.nombre}</h4>
-                <div class="flex gap-1 items-center">
-                    ${shopifyIcon}
-                    <span class="text-[10px] bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded text-gray-500">${timeAgo(lead.fecha?.toDate ? lead.fecha.toDate() : null)}</span>
-                </div>
+                <h4 class="font-bold text-sm text-gray-800 dark:text-gray-100">${lead.nombre}</h4>
+                <span class="text-[10px] bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded text-gray-500">${timeAgo(lead.fecha?.toDate())}</span>
             </div>
             <p class="text-xs text-gray-500 dark:text-gray-400 mb-2 truncate">${lead.email}</p>
             <div class="flex items-center justify-between mt-3">
-                 <span class="text-[10px] font-bold text-brand-600 bg-brand-50 dark:bg-brand-900/30 px-2 py-1 rounded truncate max-w-[100px]">${lead.curso_interes || 'Lead'}</span>
+                 <span class="text-[10px] font-bold text-brand-600 bg-brand-50 dark:bg-brand-900/30 px-2 py-1 rounded">${lead.curso_interes}</span>
+                 ${trashBadge}
             </div>
         `;
-        col.appendChild(card);
+
+        // Si es 'trashed', lo ponemos en la primera columna para que se vea
+        if (lead.status === 'trashed') cols['pendiente'].appendChild(card);
+        else col.appendChild(card);
     });
 
     Object.values(cols).forEach(el => {
         new Sortable(el, {
-            group: 'kanban', animation: 150, ghostClass: 'sortable-ghost',
+            group: 'kanban',
+            animation: 150,
+            ghostClass: 'sortable-ghost',
             onEnd: async (evt) => {
-                if(state.trashMode) return;
+                // Si estamos en papelera, no permitimos mover tarjetas (opcional)
+                if (state.trashMode) return;
+
                 const id = evt.item.getAttribute('data-id');
                 const newStatus = evt.to.getAttribute('data-status');
-                if(id && newStatus) await leadsService.update(id, { status: newStatus });
+                if (id && newStatus) {
+                    await leadsService.update(id, { status: newStatus });
+                }
             }
         });
     });
 }
 
-// === PLANTILLAS & EMAILS ===
-function findBestTemplate(lead) {
-    if (!lead) return null;
-    const interests = Array.isArray(lead.intereses) ? lead.intereses : [lead.curso_interes];
-    for(let interest of interests) {
-        if(!interest) continue;
-        const cleanInterest = String(interest).toLowerCase().trim();
-        const match = state.templates.find(t => {
-            const tName = (t.courseName || '').toLowerCase();
-            return tName !== 'manual' && tName !== 'todos los cursos' && (tName.includes(cleanInterest) || cleanInterest.includes(tName));
-        });
-        if(match) return match;
-    }
-    return state.templates.find(t => t.courseName === 'Todos los Cursos');
-}
-
+// === SMART EMAILS (LÓGICA CON VISTA PREVIA) ===
 function handleSmartEmail(leadId) {
     const lead = state.leads.find(l => l.id === leadId);
-    if(!lead) return;
+    if (!lead) return;
 
-    const template = findBestTemplate(lead);
+    const template = findBestTemplate(lead.curso_interes);
 
     if (template) {
-        let rawBody = template.body.replace(/{nombre}/g, (lead.nombre || '').split(' ')[0]); 
-        if (template.pdfLink) rawBody += `\n\nTemario: ${template.pdfLink}`;
-        
+        // FIXED: Reemplazar \n por \r\n para compatibilidad con Outlook
+        let rawBody = template.body.replace(/{nombre}/g, (lead.nombre || '').split(' ')[0]);
+        if (template.pdfLink) {
+            rawBody += `\n\nPuedes ver el temario aquí: ${template.pdfLink}`;
+        }
+
+        // Conversión crítica para Outlook
         const body = rawBody.replace(/\n/g, "\r\n");
+
         const mailtoLink = `mailto:${lead.email}?subject=${encodeURIComponent(template.subject)}&body=${encodeURIComponent(body)}`;
-        
+
+        // MOSTRAR VISTA PREVIA SIEMPRE
         Swal.fire({
-            title: 'Vista Previa',
-            html: `<div class="text-left text-xs p-4 bg-gray-50 border rounded whitespace-pre-wrap">${rawBody}</div>`,
+            title: 'Vista Previa del Correo',
+            html: `
+                <div class="text-left bg-gray-50 dark:bg-gray-800 p-4 rounded-lg text-sm border border-gray-200 dark:border-gray-700 mb-2">
+                    <div class="mb-1"><strong class="text-gray-500">Para:</strong> ${lead.email}</div>
+                    <div class="mb-2"><strong class="text-gray-500">Asunto:</strong> ${template.subject}</div>
+                    <hr class="border-gray-200 dark:border-gray-700 my-2">
+                    <div class="whitespace-pre-wrap text-gray-700 dark:text-gray-300 max-h-48 overflow-y-auto text-xs leading-relaxed">${rawBody}</div>
+                </div>
+                <p class="text-xs text-gray-400 mt-2">Al confirmar, se abrirá tu aplicación de correo (Outlook/Gmail).</p>
+            `,
             showCancelButton: true,
-            confirmButtonText: '<i class="fa-solid fa-paper-plane"></i> Abrir Correo'
+            confirmButtonText: '<i class="fa-solid fa-paper-plane"></i> Abrir Outlook/Correo',
+            cancelButtonText: 'Cancelar',
+            confirmButtonColor: '#2563eb'
         }).then((result) => {
             if (result.isConfirmed) {
+                // FIXED: Usar enlace invisible y click() para forzar apertura en más navegadores
                 const link = document.createElement('a');
                 link.href = mailtoLink;
+                // link.target = '_blank'; // Descomentar si aún falla, pero puede dejar pestañas en blanco
+                document.body.appendChild(link);
                 link.click();
+                document.body.removeChild(link);
+
+                // 2. Marcar como enviado visualmente (Sin cambiar estado a contactado)
                 leadsService.update(leadId, { emailSent: true });
             }
         });
+
     } else {
-        window.location.href = `mailto:${lead.email}`;
+        Swal.fire({
+            title: 'Sin Plantilla',
+            text: `No hay plantilla para "${lead.curso_interes}" ni una plantilla general.`,
+            icon: 'info',
+            showCancelButton: true,
+            confirmButtonText: 'Enviar Vacío',
+            cancelButtonText: 'Crear Plantilla'
+        }).then((res) => {
+            if (res.isConfirmed) {
+                window.location.href = `mailto:${lead.email}?subject=Información Curso ${lead.curso_interes}`;
+            } else if (res.dismiss === Swal.DismissReason.cancel) {
+                openEmailConfigModal();
+                setTimeout(() => {
+                    const select = document.getElementById('tpl-course');
+                    const options = Array.from(select.options).map(o => o.value);
+                    if (options.includes(lead.curso_interes)) {
+                        select.value = lead.curso_interes;
+                    }
+                    updatePreview();
+                }, 300);
+            }
+        });
     }
 }
 
-// === GESTIÓN DE PLANTILLAS (UI) ===
+// === GESTIÓN DEL MODAL DE PLANTILLAS ===
 function openEmailConfigModal() {
     document.getElementById('email-config-modal').classList.remove('hidden');
     renderTemplatesList();
@@ -421,16 +466,27 @@ function openEmailConfigModal() {
 function renderTemplatesList() {
     const container = document.getElementById('templates-list');
     container.innerHTML = '';
-    
+
     if (state.templates.length === 0) {
-        container.innerHTML = '<div class="p-4 text-xs text-gray-400 text-center">Sin plantillas</div>';
+        container.innerHTML = '<div class="p-4 text-xs text-gray-400 text-center">No hay plantillas creadas</div>';
         return;
     }
 
     state.templates.forEach(tpl => {
+        let icon = '';
+        if (tpl.courseName === 'Manual') icon = '<i class="fa-solid fa-hand-pointer text-gray-400 text-[10px]" title="Manual"></i>';
+        else if (tpl.courseName === 'Todos los Cursos') icon = '<i class="fa-solid fa-globe text-blue-400 text-[10px]" title="Global"></i>';
+        else if (tpl.autoSend) icon = '<i class="fa-solid fa-bolt text-yellow-400 text-[10px]" title="Auto/Preferida"></i>';
+
         const div = document.createElement('div');
         div.className = `email-sidebar-item p-3 rounded-lg cursor-pointer flex justify-between items-center mb-1 ${state.activeTemplateId === tpl.id ? 'active' : ''}`;
-        div.innerHTML = `<p class="font-bold text-sm text-gray-700 dark:text-gray-200 truncate">${tpl.courseName}</p>`;
+        div.innerHTML = `
+            <div class="overflow-hidden">
+                <p class="font-bold text-sm text-gray-700 dark:text-gray-200 truncate">${tpl.courseName}</p>
+                <p class="text-[11px] text-gray-500 truncate">${tpl.subject}</p>
+            </div>
+            ${icon}
+        `;
         div.onclick = () => loadTemplateEditor(tpl);
         container.appendChild(div);
     });
@@ -446,19 +502,25 @@ function loadTemplateEditor(tpl) {
     document.getElementById('tpl-link').value = tpl ? tpl.pdfLink : '';
     document.getElementById('tpl-body').value = tpl ? tpl.body : '';
     document.getElementById('tpl-auto').checked = tpl ? tpl.autoSend : false;
-    
+
     updatePreview();
 
     const delBtn = document.getElementById('btn-delete-template');
     if (tpl) {
         delBtn.classList.remove('hidden');
         delBtn.onclick = async () => {
-            if((await Swal.fire({title:'¿Eliminar?', icon:'warning', showCancelButton:true})).isConfirmed) {
-                await templatesService.delete(tpl.id);
-                resetEditor();
+            const res = await Swal.fire({ title: '¿Eliminar Plantilla?', icon: 'warning', showCancelButton: true, confirmButtonColor: '#ef4444' });
+            if (res.isConfirmed) {
+                try {
+                    await templatesService.delete(tpl.id);
+                    Swal.fire({ toast: true, icon: 'success', title: 'Eliminada', position: 'top-end', showConfirmButton: false, timer: 1500 });
+                    resetEditor();
+                } catch (e) { Swal.fire('Error', 'No se pudo eliminar', 'error'); }
             }
         };
-    } else delBtn.classList.add('hidden');
+    } else {
+        delBtn.classList.add('hidden');
+    }
 }
 
 function resetEditor() {
@@ -467,21 +529,33 @@ function resetEditor() {
     document.getElementById('template-empty-state').classList.remove('hidden');
     document.getElementById('tpl-course').value = "";
     ['tpl-subject', 'tpl-link', 'tpl-body'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('tpl-auto').checked = false;
+    updatePreview();
 }
 
 function updatePreview() {
-    document.getElementById('preview-subject').textContent = document.getElementById('tpl-subject').value || 'Asunto';
-    document.getElementById('preview-body').textContent = document.getElementById('tpl-body').value || 'Cuerpo del correo...';
-    
+    const subject = document.getElementById('tpl-subject').value || 'Sin asunto';
+    const body = document.getElementById('tpl-body').value || 'Escribe un mensaje...';
     const link = document.getElementById('tpl-link').value;
-    const att = document.getElementById('preview-attachment');
-    if(link) { att.classList.remove('hidden'); att.classList.add('flex'); }
-    else { att.classList.add('hidden'); att.classList.remove('flex'); }
+
+    document.getElementById('preview-subject').textContent = subject;
+    document.getElementById('preview-body').textContent = body;
+
+    const attachmentEl = document.getElementById('preview-attachment');
+    if (link && link.length > 5) {
+        attachmentEl.classList.remove('hidden');
+        attachmentEl.classList.add('flex');
+    } else {
+        attachmentEl.classList.add('hidden');
+        attachmentEl.classList.remove('flex');
+    }
 }
 
 async function saveCurrentTemplate() {
     const btn = document.getElementById('btn-save-template');
-    btn.innerHTML = 'Guardando...'; btn.disabled = true;
+    const originalText = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Guardando...';
 
     const data = {
         courseName: document.getElementById('tpl-course').value,
@@ -493,80 +567,100 @@ async function saveCurrentTemplate() {
 
     try {
         await templatesService.save(state.activeTemplateId, data);
-        Swal.fire({toast: true, icon: 'success', title: 'Guardado', position: 'top-end', timer: 1500});
+        Swal.fire({
+            toast: true, icon: 'success', title: state.activeTemplateId ? 'Actualizada' : 'Creada',
+            position: 'top-end', showConfirmButton: false, timer: 2000
+        });
         if (!state.activeTemplateId) resetEditor();
-    } catch (e) { Swal.fire('Error', e.message, 'error'); }
-    finally { btn.innerHTML = '<i class="fa-solid fa-save"></i> Guardar Plantilla'; btn.disabled = false; }
+    } catch (error) {
+        Swal.fire({ title: 'Error al Guardar', text: error.message, icon: 'error' });
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+    }
 }
 
-// === AUXILIARES (KPI, Chart, UI) ===
+// === EVENT LISTENERS GENERALES ===
+function initEventListeners() {
+    document.getElementById('login-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const email = document.getElementById('login-email').value;
+        const password = document.getElementById('login-password').value;
+        const res = await authService.login(email, password);
+        if (!res.success) Swal.fire('Error de Acceso', 'Verifica credenciales.', 'error');
+    });
+
+    document.getElementById('logout-btn').onclick = () => authService.logout();
+    document.getElementById('search-input').onkeyup = (e) => { state.filters.search = e.target.value; renderApp(); };
+    document.getElementById('filter-date').onchange = (e) => { state.filters.date = e.target.value; renderApp(); };
+    document.getElementById('filter-course').onchange = (e) => { state.filters.course = e.target.value; renderApp(); };
+    document.getElementById('btn-view-table').onclick = () => { state.view = 'table'; renderApp(); };
+    document.getElementById('btn-view-kanban').onclick = () => { state.view = 'kanban'; renderApp(); };
+
+    document.getElementById('btn-trash').onclick = () => {
+        state.trashMode = !state.trashMode;
+        renderApp();
+    };
+
+    document.getElementById('export-btn').onclick = exportToExcel;
+
+    document.getElementById('btn-config-email').onclick = openEmailConfigModal;
+    document.getElementById('modal-backdrop-close').onclick = () => document.getElementById('email-config-modal').classList.add('hidden');
+    document.getElementById('btn-close-modal').onclick = () => document.getElementById('email-config-modal').classList.add('hidden');
+    document.getElementById('btn-new-template').onclick = () => loadTemplateEditor(null);
+    document.getElementById('btn-save-template').onclick = saveCurrentTemplate;
+
+    ['tpl-subject', 'tpl-body', 'tpl-link'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.addEventListener('keyup', updatePreview);
+            el.addEventListener('change', updatePreview);
+        }
+    });
+}
+
+// === HELPERS & CHART ===
 function updateKPIs(leads) {
     const active = leads.filter(l => l.status !== 'trashed');
-    if(document.getElementById('kpi-total')) document.getElementById('kpi-total').textContent = active.length;
-    if(document.getElementById('kpi-pending')) document.getElementById('kpi-pending').textContent = active.filter(l => (l.status||'pendiente') === 'pendiente').length;
-    if(document.getElementById('kpi-contacted')) document.getElementById('kpi-contacted').textContent = active.filter(l => l.status === 'contactado').length;
+    document.getElementById('kpi-total').textContent = active.length;
+    document.getElementById('kpi-pending').textContent = active.filter(l => l.status === 'pendiente').length;
+    document.getElementById('kpi-contacted').textContent = active.filter(l => l.status === 'contactado').length;
 }
 
 function updateChart(leads) {
     const ctx = document.getElementById('trendChart')?.getContext('2d');
-    if(!ctx) return;
-    const labels = [], dataPoints = [];
-    for(let i=6; i>=0; i--) {
+    if (!ctx) return;
+    const dataPoints = Array(7).fill(0);
+    const labels = [];
+    for (let i = 6; i >= 0; i--) {
         const d = new Date(); d.setDate(d.getDate() - i);
-        labels.push(d.toLocaleDateString('es', {weekday:'short'}));
-        const dayStart = new Date(d.setHours(0,0,0,0));
-        const dayEnd = new Date(d.setHours(23,59,59,999));
-        
-        const count = leads.filter(l => {
-            if(!l.fecha) return false;
-            try {
-                const ld = l.fecha.toDate();
-                return ld >= dayStart && ld <= dayEnd;
-            } catch(e) { return false; }
+        labels.push(d.toLocaleDateString('es', { weekday: 'short' }));
+        const dayStart = new Date(d.setHours(0, 0, 0, 0));
+        const dayEnd = new Date(d.setHours(23, 59, 59, 999));
+        dataPoints[6 - i] = leads.filter(l => {
+            if (!l.fecha) return false;
+            const ld = l.fecha.toDate();
+            return ld >= dayStart && ld <= dayEnd;
         }).length;
-        dataPoints.push(count);
     }
-    if(state.chartInstance) state.chartInstance.destroy();
+    if (state.chartInstance) state.chartInstance.destroy();
     state.chartInstance = new Chart(ctx, {
         type: 'line',
         data: { labels, datasets: [{ label: 'Leads', data: dataPoints, borderColor: '#3b82f6', backgroundColor: 'rgba(59, 130, 246, 0.1)', fill: true, tension: 0.4 }] },
-        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: {display:false} }, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } }
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
     });
 }
 
 function updateViewButtons() {
     const btnTable = document.getElementById('btn-view-table');
     const btnKanban = document.getElementById('btn-view-kanban');
-    const activeClass = "px-4 py-2 rounded-lg text-sm font-bold bg-brand-600 text-white shadow-sm transition";
-    const inactiveClass = "px-4 py-2 rounded-lg text-sm font-medium text-gray-500 hover:bg-gray-100 transition";
-    btnTable.className = state.view === 'table' ? activeClass : inactiveClass;
-    btnKanban.className = state.view === 'kanban' ? activeClass : inactiveClass;
-}
-
-function updateTrashButtonState() {
-    const trashBtn = document.getElementById('btn-trash');
-    if (state.trashMode) {
-        trashBtn.classList.add('text-red-600', 'bg-red-100', 'ring-2', 'ring-red-400');
-        trashBtn.innerHTML = '<i class="fa-solid fa-folder-open"></i>'; 
-        trashBtn.title = "Salir de Papelera (Ver Activos)";
+    if (state.view === 'table') {
+        btnTable.className = "px-4 py-2 rounded-lg text-sm font-bold bg-brand-600 text-white shadow-sm transition";
+        btnKanban.className = "px-4 py-2 rounded-lg text-sm font-medium text-gray-500 hover:bg-gray-100 transition";
     } else {
-        trashBtn.classList.remove('text-red-600', 'bg-red-100', 'ring-2', 'ring-red-400');
-        trashBtn.innerHTML = '<i class="fa-solid fa-trash-can"></i>';
-        trashBtn.title = "Ver Papelera";
+        btnTable.className = "px-4 py-2 rounded-lg text-sm font-medium text-gray-500 hover:bg-gray-100 transition";
+        btnKanban.className = "px-4 py-2 rounded-lg text-sm font-bold bg-brand-600 text-white shadow-sm transition";
     }
-}
-
-function toggleTrashBanner() {
-    let banner = document.getElementById('trash-banner');
-    if (!banner) {
-        banner = document.createElement('div');
-        banner.id = 'trash-banner';
-        banner.className = 'hidden bg-red-50 border-b border-red-100 text-red-600 text-center py-2 text-sm font-bold flex items-center justify-center gap-2 mb-4 rounded-xl';
-        banner.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> ESTÁS VIENDO LA PAPELERA DE RECICLAJE (Archivos Eliminados)';
-        const container = document.querySelector('main > div.relative');
-        if (container) container.parentNode.insertBefore(banner, container);
-    }
-    state.trashMode ? banner.classList.remove('hidden') : banner.classList.add('hidden');
 }
 
 function isCorporate(email) {
@@ -574,23 +668,21 @@ function isCorporate(email) {
 }
 
 function timeAgo(date) {
-    if(!date) return '';
-    try {
-        const seconds = Math.floor((new Date() - date) / 1000);
-        const intervals = { año: 31536000, mes: 2592000, día: 86400, h: 3600, min: 60 };
-        for (let [unit, sec] of Object.entries(intervals)) {
-            const val = Math.floor(seconds / sec);
-            if (val >= 1) return `${val} ${unit}${val>1 && unit.length>3 ? 's' : ''}`;
-        }
-        return "Ahora";
-    } catch(e) { return ""; }
+    if (!date) return '';
+    const seconds = Math.floor((new Date() - date) / 1000);
+    const intervals = { año: 31536000, mes: 2592000, día: 86400, h: 3600, min: 60 };
+    for (let [unit, sec] of Object.entries(intervals)) {
+        const val = Math.floor(seconds / sec);
+        if (val >= 1) return `${val} ${unit}${val > 1 && unit.length > 3 ? 's' : ''}`;
+    }
+    return "Ahora";
 }
 
 function calculateScore(lead) {
     let score = 1;
-    if(lead.telefono) score++;
-    if(lead.mensaje && lead.mensaje.length > 10) score++;
-    if(isCorporate(lead.email)) score += 2;
+    if (lead.telefono) score++;
+    if (lead.mensaje && lead.mensaje.length > 10) score++;
+    if (isCorporate(lead.email)) score += 2;
     return Math.min(score, 5);
 }
 
@@ -605,107 +697,42 @@ function getStatusClass(s) {
 }
 
 function attachDynamicListeners() {
-    // Email
     document.querySelectorAll('.action-email').forEach(btn => {
         btn.onclick = () => handleSmartEmail(btn.getAttribute('data-id'));
     });
-    // Status Toggle
     document.querySelectorAll('.status-badge').forEach(badge => {
         badge.onclick = async () => {
             const id = badge.getAttribute('data-id');
-            const next = badge.getAttribute('data-status') === 'contactado' ? 'pendiente' : 'contactado';
+            const current = badge.getAttribute('data-status');
+            const next = current === 'contactado' ? 'pendiente' : 'contactado';
             await leadsService.update(id, { status: next });
         };
     });
-    // Mover a Papelera
-    document.querySelectorAll('.action-trash').forEach(btn => {
-        btn.onclick = () => leadsService.moveToTrash(btn.getAttribute('data-id'));
-    });
-    // Restaurar desde Papelera
-    document.querySelectorAll('.action-restore').forEach(btn => {
-        btn.onclick = () => leadsService.update(btn.getAttribute('data-id'), { status: 'pendiente' });
-    });
-    // Borrado Definitivo
+    document.querySelectorAll('.action-trash').forEach(btn =>
+        btn.onclick = () => leadsService.moveToTrash(btn.getAttribute('data-id')));
+    document.querySelectorAll('.action-restore').forEach(btn =>
+        leadsService.update(btn.getAttribute('data-id'), { status: 'pendiente' }));
     document.querySelectorAll('.action-delete').forEach(btn => {
         btn.onclick = async () => {
-            if((await Swal.fire({title:'¿Borrar para siempre?', icon:'warning', showCancelButton:true})).isConfirmed) 
-                leadsService.deletePermanent(btn.getAttribute('data-id'));
+            const res = await Swal.fire({ title: '¿Eliminar definitivamente?', text: 'No se puede deshacer', icon: 'warning', showCancelButton: true, confirmButtonColor: '#ef4444' });
+            if (res.isConfirmed) leadsService.deletePermanent(btn.getAttribute('data-id'));
         };
     });
-    // Notas
     document.querySelectorAll('.action-note').forEach(btn => {
         btn.onclick = async () => {
-            const { value } = await Swal.fire({input: 'textarea', inputValue: btn.getAttribute('data-note'), title: 'Nota'});
-            if(value !== undefined) leadsService.update(btn.getAttribute('data-id'), { observaciones: value });
+            const id = btn.getAttribute('data-id');
+            const note = btn.getAttribute('data-note');
+            const { value: text } = await Swal.fire({ input: 'textarea', inputValue: note, title: 'Notas Internas' });
+            if (text !== undefined) await leadsService.update(id, { observaciones: text });
         };
     });
-    // WhatsApp
     document.querySelectorAll('.action-wa').forEach(btn => {
         btn.onclick = () => {
-            const p = btn.getAttribute('data-phone');
-            if(p) window.open(`https://wa.me/${p.replace(/\D/g, '')}`, '_blank');
-            else Swal.fire('Sin teléfono', '', 'info');
+            const phone = btn.getAttribute('data-phone');
+            const name = btn.getAttribute('data-name');
+            if (!phone) return Swal.fire('Sin teléfono', '', 'info');
+            const p = phone.replace(/\D/g, '').length === 9 ? '56' + phone.replace(/\D/g, '') : phone.replace(/\D/g, '');
+            window.open(`https://wa.me/${p}?text=Hola ${name}, te contacto de ProgramBI...`, '_blank');
         };
-    });
-}
-
-function injectManualSyncButton() {
-    const toolbar = document.querySelector('.flex.items-center.gap-2.w-full.sm\\:w-auto.justify-end');
-    if(toolbar && !document.getElementById('btn-manual-sync')) {
-        const btn = document.createElement('button');
-        btn.id = 'btn-manual-sync';
-        // Botón verde llamativo
-        btn.className = "bg-green-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-green-700 ml-2 shadow-lg flex items-center gap-2";
-        btn.innerHTML = "<i class='fa-solid fa-rotate'></i> Sincronizar Todo (Forzar)";
-        
-        btn.onclick = () => {
-            // Forzar sync manual de todo lo que NO esté synced, incluso errores previos
-            const allPending = state.leads.filter(l => l.shopify_status !== 'synced');
-            runBatchSync(allPending, false); 
-        };
-        
-        toolbar.prepend(btn);
-    }
-}
-
-// === LISTENERS GENERALES ===
-function initEventListeners() {
-    const loginForm = document.getElementById('login-form');
-    if(loginForm) {
-        loginForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const res = await authService.login(
-                document.getElementById('login-email').value,
-                document.getElementById('login-password').value
-            );
-            if (!res.success) Swal.fire('Error', 'Credenciales incorrectas', 'error');
-        });
-    }
-    document.getElementById('logout-btn').onclick = () => authService.logout();
-
-    // Filtros
-    document.getElementById('search-input').onkeyup = (e) => { state.filters.search = e.target.value; renderApp(); };
-    document.getElementById('filter-date').onchange = (e) => { state.filters.date = e.target.value; renderApp(); };
-    document.getElementById('filter-course').onchange = (e) => { state.filters.course = e.target.value; renderApp(); };
-    
-    // Vistas
-    document.getElementById('btn-view-table').onclick = () => { state.view = 'table'; renderApp(); };
-    document.getElementById('btn-view-kanban').onclick = () => { state.view = 'kanban'; renderApp(); };
-    
-    // Botón Papelera
-    document.getElementById('btn-trash').onclick = () => { 
-        state.trashMode = !state.trashMode; 
-        renderApp(); 
-    };
-
-    // Modal Email
-    document.getElementById('btn-config-email').onclick = openEmailConfigModal;
-    document.getElementById('modal-backdrop-close').onclick = () => document.getElementById('email-config-modal').classList.add('hidden');
-    document.getElementById('btn-close-modal').onclick = () => document.getElementById('email-config-modal').classList.add('hidden');
-    document.getElementById('btn-new-template').onclick = () => loadTemplateEditor(null);
-    document.getElementById('btn-save-template').onclick = saveCurrentTemplate;
-
-    ['tpl-subject', 'tpl-body', 'tpl-link'].forEach(id => {
-        document.getElementById(id)?.addEventListener('keyup', updatePreview);
     });
 }
